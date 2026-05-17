@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -34,9 +35,33 @@ def ensure_installed() -> None:
         install()
 
 
+def _ensure_package_installed(python: str) -> None:
+    """Ensure relay is importable from any working directory, not just the project root."""
+    result = subprocess.run(
+        [python, "-c", "import relay"],
+        cwd="/",
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        project_root = Path(__file__).parent.parent
+        print("  Installing relay package into current environment...")
+        # Try pip first, fall back to uv (some venvs ship without pip)
+        pip_ok = subprocess.run(
+            [python, "-m", "pip", "install", "-e", str(project_root)],
+            capture_output=True,
+        ).returncode == 0
+        if not pip_ok:
+            subprocess.run(
+                ["uv", "pip", "install", "-e", str(project_root)],
+                check=True,
+            )
+
+
 def install() -> None:
     # Use the current Python interpreter — same environment relay is already running in
     python = sys.executable
+
+    _ensure_package_installed(python)
 
     settings = _load_settings()
 
