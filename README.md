@@ -27,14 +27,41 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
 
 | 条件 | 结果 |
 |---|---|
-| 高风险操作（删文件、force push、drop 表） | 始终拦截 |
+| 高风险操作（删文件、force push、drop 表、写系统路径） | 始终拦截 |
 | 低风险 + 历史批准率 ≥ 90% | 始终直接执行 |
 | 该类型操作首次出现（无历史） | 低风险直接执行，其他拦截一次建立基线 |
 | 其他情况 | 历史批准率 < 80% 则拦截 |
 
+操作类型按路径和命令细分，各自独立积累批准率：
+
+| 操作类型 | 说明 | 风险 |
+|---|---|---|
+| `file_write:system` | 写入 `/etc/`、`/usr/` 等系统路径 | 高 |
+| `file_write:config` | 写入 `.env`、`.yaml`、`.toml` 等配置文件 | 中 |
+| `file_write:code` | 写入普通代码文件 | 中 |
+| `bash_write:git` | git commit / push / merge | 中 |
+| `bash_write:package_manager` | pip / uv / npm 安装 | 中 |
+| `bash_write:shell` | mv / cp / chmod 等 shell 操作 | 中 |
+| `file_delete` | rm、drop table 等删除操作 | 高 |
+| `bash_read` / `file_read` | 只读操作 | 低 |
+
 ## 安装
 
-将以下配置添加到 **`~/.claude/mcp.json`**：
+**全局安装**（推荐）——将以下配置添加到 **`~/.claude/claude_desktop_config.json`**：
+
+```json
+{
+  "mcpServers": {
+    "relay": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+    }
+  }
+}
+```
+
+**项目级安装**——在项目根目录创建 **`.mcp.json`**：
 
 ```json
 {

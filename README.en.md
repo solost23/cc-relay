@@ -27,14 +27,41 @@ History accumulates → future decisions for the same action type become more ac
 
 | Condition | Result |
 |---|---|
-| High-risk operation (delete files, force push, drop table) | Always interrupt |
+| High-risk operation (delete files, force push, drop table, write to system paths) | Always interrupt |
 | Low risk + historical approval rate ≥ 90% | Always auto-approve |
 | First occurrence of this action type (no history) | Low risk: auto-approve; others: interrupt once to build baseline |
 | Everything else | Interrupt if approval rate < 80% |
 
+Action types are partitioned by path and command, each accumulating approval rates independently:
+
+| Action type | Description | Risk |
+|---|---|---|
+| `file_write:system` | Write to `/etc/`, `/usr/`, etc. | High |
+| `file_write:config` | Write to `.env`, `.yaml`, `.toml`, etc. | Medium |
+| `file_write:code` | Write to regular code files | Medium |
+| `bash_write:git` | git commit / push / merge | Medium |
+| `bash_write:package_manager` | pip / uv / npm installs | Medium |
+| `bash_write:shell` | mv / cp / chmod and other shell ops | Medium |
+| `file_delete` | rm, drop table, and other deletions | High |
+| `bash_read` / `file_read` | Read-only operations | Low |
+
 ## Installation
 
-Add the following to **`~/.claude/mcp.json`**:
+**Global install** (recommended) — add the following to **`~/.claude/claude_desktop_config.json`**:
+
+```json
+{
+  "mcpServers": {
+    "relay": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+    }
+  }
+}
+```
+
+**Per-project install** — create **`.mcp.json`** in your project root:
 
 ```json
 {

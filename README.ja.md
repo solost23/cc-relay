@@ -27,14 +27,41 @@ ask   → ツールを一時停止、デスクトップ通知を送信、Claude 
 
 | 条件 | 結果 |
 |---|---|
-| 高リスク操作（ファイル削除、force push、テーブル削除） | 常に割り込む |
+| 高リスク操作（ファイル削除、force push、テーブル削除、システムパスへの書き込み） | 常に割り込む |
 | 低リスク + 過去の承認率 ≥ 90% | 常に自動承認 |
 | この操作タイプが初回（履歴なし） | 低リスク：自動承認、それ以外：一度割り込んでベースラインを構築 |
 | その他 | 承認率 < 80% の場合は割り込む |
 
+操作タイプはパスとコマンドで細分化され、それぞれ独立して承認率を蓄積します：
+
+| 操作タイプ | 説明 | リスク |
+|---|---|---|
+| `file_write:system` | `/etc/`、`/usr/` などへの書き込み | 高 |
+| `file_write:config` | `.env`、`.yaml`、`.toml` などの設定ファイルへの書き込み | 中 |
+| `file_write:code` | 通常のコードファイルへの書き込み | 中 |
+| `bash_write:git` | git commit / push / merge | 中 |
+| `bash_write:package_manager` | pip / uv / npm インストール | 中 |
+| `bash_write:shell` | mv / cp / chmod などのシェル操作 | 中 |
+| `file_delete` | rm、drop table などの削除操作 | 高 |
+| `bash_read` / `file_read` | 読み取り専用操作 | 低 |
+
 ## インストール
 
-**`~/.claude/mcp.json`** に以下を追加してください：
+**グローバルインストール**（推奨）— **`~/.claude/claude_desktop_config.json`** に以下を追加してください：
+
+```json
+{
+  "mcpServers": {
+    "relay": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+    }
+  }
+}
+```
+
+**プロジェクト単位のインストール**— プロジェクトルートに **`.mcp.json`** を作成してください：
 
 ```json
 {
