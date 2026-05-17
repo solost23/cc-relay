@@ -3,6 +3,7 @@ import sys
 
 import relay.db as _db
 from relay.assessor import assess_risk
+from relay.decision import should_interrupt as _should_interrupt
 from relay.notifier import send_notification
 
 # Map Claude Code tool names to relay action_type
@@ -17,12 +18,11 @@ _TOOL_TO_ACTION_TYPE = {
     "WebSearch": "network_request",
 }
 
-# Low-risk tools that never need interruption
+# Tools that are always safe — skip assessment entirely
 _ALWAYS_ALLOW = {"Read", "Glob", "Grep", "WebSearch", "AskUserQuestion", "ExitPlanMode", "LSP"}
 
 
 def _bash_action_type(command: str) -> str:
-    """Infer action_type from a bash command string."""
     cmd = command.strip().lower()
     danger_prefixes = ("rm ", "rm\t", "rmdir", "sudo rm", "git reset", "git push --force",
                        "git push -f", "drop table", "truncate ", "delete from")
@@ -39,7 +39,7 @@ def _bash_action_type(command: str) -> str:
         return "bash_write"
     if any(cmd.startswith(p) for p in read_prefixes):
         return "bash_read"
-    return "bash_write"  # default bash to write-risk
+    return "bash_write"
 
 
 def _get_action_type(tool_name: str, tool_input: dict) -> str:
@@ -69,38 +69,22 @@ def handle_pre_tool_use(payload: dict) -> dict:
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
 
-    risk = assess_risk(action_type, description)
-    approval_rate = _db.get_approval_rate(action_type)
-    risk_level = risk["risk_level"]
-    has_history = len(_db.get_recent_decisions(action_type, limit=1)) > 0
+    interrupt, reason = _should_interrupt(action_type, description)
 
-    if risk_level == "high":
-        should_interrupt = True
-        reason = f"High-risk operation: {risk['reason']}"
-    elif risk_level == "low" and has_history and approval_rate >= 0.9:
-        should_interrupt = False
-        reason = "Auto-approved: low risk with high historical approval rate."
-    elif not has_history:
-        should_interrupt = risk_level != "low"
-        reason = f"First time seeing '{action_type}' — asking once to establish baseline."
-    else:
-        should_interrupt = approval_rate < 0.8
-        reason = f"{risk_level.capitalize()} risk, {approval_rate:.0%} historical approval rate."
-
-    if should_interrupt:
+    if interrupt:
         send_notification(
             title="Relay: Action needs your approval",
             message=f"{tool_name}: {description[:100]}\n\nReturn to your terminal to respond.",
         )
         return _deny(reason)
 
-    # Auto-approved — record it
-    _db.record_decision(action_type, description, "approved", risk_level)
+    risk = assess_risk(action_type, description)
+    _db.record_decision(action_type, description, "approved", risk["risk_level"])
     return _allow()
 
 
 def handle_post_tool_use(payload: dict) -> dict:
-    """Record decisions for operations that were interrupted and user approved."""
+    """Record user-approved decisions (tool ran = user approved after deny)."""
     tool_name = payload.get("tool_name", "")
     if tool_name in _ALWAYS_ALLOW:
         return {}
@@ -108,8 +92,6 @@ def handle_post_tool_use(payload: dict) -> dict:
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
     risk = assess_risk(action_type, description)
-
-    # Tool ran successfully — user must have approved it
     _db.record_decision(action_type, description, "approved", risk["risk_level"])
     return {}
 

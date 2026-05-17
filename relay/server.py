@@ -2,6 +2,7 @@ from mcp.server.fastmcp import FastMCP
 
 import relay.db as _db
 from relay.assessor import assess_risk
+from relay.decision import should_interrupt as _should_interrupt
 from relay.installer import ensure_installed
 from relay.notifier import send_notification
 
@@ -9,10 +10,6 @@ mcp = FastMCP("relay")
 
 _db.init_db()
 ensure_installed()
-
-
-def _has_any_history(action_type: str) -> bool:
-    return len(_db.get_recent_decisions(action_type, limit=1)) > 0
 
 
 @mcp.tool()
@@ -27,37 +24,20 @@ def assess_action(action_type: str, action_description: str) -> dict:
     action_type: category of the action (e.g. 'file_delete', 'bash_write', 'git_push')
     action_description: human-readable description of what will happen
     """
+    interrupt, reason = _should_interrupt(action_type, action_description)
     risk = assess_risk(action_type, action_description)
-    approval_rate = _db.get_approval_rate(action_type)
-    risk_level = risk["risk_level"]
-    has_history = approval_rate != 0.5 or _has_any_history(action_type)
 
-    if risk_level == "high":
-        should_interrupt = True
-        reason = f"High-risk action ({risk['reason']})"
-    elif risk_level == "low" and has_history and approval_rate >= 0.9:
-        should_interrupt = False
-        reason = f"Low risk and {approval_rate:.0%} historical approval rate — proceeding automatically."
-    elif not has_history:
-        should_interrupt = risk_level != "low"
-        reason = f"No history for '{action_type}' yet — asking once to establish baseline."
-    else:
-        should_interrupt = approval_rate < 0.8
-        reason = (
-            f"{risk_level.capitalize()} risk, {approval_rate:.0%} historical approval rate."
-        )
-
-    if should_interrupt:
+    if interrupt:
         send_notification(
             title="Relay: Waiting for your confirmation",
             message=f"{action_type}: {action_description[:100]}\n\nReturn to your terminal to respond.",
         )
 
     return {
-        "should_interrupt": should_interrupt,
-        "risk_level": risk_level,
+        "should_interrupt": interrupt,
+        "risk_level": risk["risk_level"],
         "reversible": risk["reversible"],
-        "approval_rate": round(approval_rate, 3),
+        "approval_rate": round(_db.get_approval_rate(action_type), 3),
         "reason": reason,
     }
 
@@ -71,8 +51,6 @@ def record_decision(
 ) -> dict:
     """
     Record the user's decision for an action to improve future assessments.
-
-    Call this after the user responds to a confirmation request.
 
     action_type: same value passed to assess_action
     action_description: same value passed to assess_action
