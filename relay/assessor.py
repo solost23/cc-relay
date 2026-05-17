@@ -5,6 +5,7 @@ _HIGH_RISK_TYPES = {
     "git_force_push",
     "rm_rf",
     "process_kill",
+    "file_write:system",
 }
 
 _LOW_RISK_TYPES = {
@@ -18,14 +19,20 @@ _LOW_RISK_TYPES = {
 }
 
 _MEDIUM_RISK_TYPES = {
-    "file_write",
+    "file_write:code",
+    "file_write:config",
     "file_create",
     "db_write",
     "db_update",
+    "bash_write:git",
+    "bash_write:package_manager",
+    "bash_write:shell",
+    "network_request",
+    # legacy — kept for existing DB records
+    "file_write",
     "git_commit",
     "git_push",
     "bash_write",
-    "network_request",
 }
 
 

@@ -1,6 +1,6 @@
 import pytest
-from unittest.mock import patch, MagicMock
-from relay.hook import handle_pre_tool_use, handle_post_tool_use
+from unittest.mock import patch
+from relay.hook import handle_pre_tool_use, handle_post_tool_use, _file_action_type, _bash_action_type
 
 
 def _pre(tool_name, tool_input=None):
@@ -15,6 +15,44 @@ def _decision(result):
     return result.get("hookSpecificOutput", {}).get("permissionDecision")
 
 
+# --- file action type classification ---
+
+def test_file_action_type_system():
+    assert _file_action_type("/etc/hosts") == "file_write:system"
+    assert _file_action_type("/usr/local/bin/foo") == "file_write:system"
+
+def test_file_action_type_config():
+    assert _file_action_type("/home/user/.env") == "file_write:config"
+    assert _file_action_type("pyproject.toml") == "file_write:config"
+    assert _file_action_type("config.yaml") == "file_write:config"
+
+def test_file_action_type_code():
+    assert _file_action_type("relay/hook.py") == "file_write:code"
+    assert _file_action_type("README.md") == "file_write:code"
+
+
+# --- bash action type classification ---
+
+def test_bash_action_type_git():
+    assert _bash_action_type("git commit -m 'fix'") == "bash_write:git"
+    assert _bash_action_type("git push origin master") == "bash_write:git"
+
+def test_bash_action_type_package_manager():
+    assert _bash_action_type("uv add requests") == "bash_write:package_manager"
+    assert _bash_action_type("npm install lodash") == "bash_write:package_manager"
+
+def test_bash_action_type_shell():
+    assert _bash_action_type("mv foo bar") == "bash_write:shell"
+    assert _bash_action_type("chmod +x script.sh") == "bash_write:shell"
+
+def test_bash_action_type_delete():
+    assert _bash_action_type("rm -rf /tmp/foo") == "file_delete"
+
+def test_bash_action_type_read():
+    assert _bash_action_type("git status") == "bash_read"
+    assert _bash_action_type("ls -la") == "bash_read"
+
+
 # --- always-allow tools ---
 
 def test_always_allow_tools_pass_through():
@@ -27,7 +65,7 @@ def test_always_allow_post_returns_empty():
     assert _post("Read", {"file_path": "/tmp/x"}) == {}
 
 
-# --- auto-approve path (no interrupt) ---
+# --- auto-approve path ---
 
 def test_auto_approved_action_returns_allow():
     with patch("relay.hook._should_interrupt", return_value=(False, "auto")), \

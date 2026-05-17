@@ -8,12 +8,9 @@ from relay.notifier import send_notification
 
 # Map Claude Code tool names to relay action_type
 _TOOL_TO_ACTION_TYPE = {
-    "Write": "file_write",
-    "Edit": "file_write",
     "Read": "file_read",
     "Glob": "file_read",
     "Grep": "file_read",
-    "NotebookEdit": "file_write",
     "WebFetch": "network_request",
     "WebSearch": "network_request",
 }
@@ -21,31 +18,51 @@ _TOOL_TO_ACTION_TYPE = {
 # Tools that are always safe — skip assessment entirely
 _ALWAYS_ALLOW = {"Read", "Glob", "Grep", "WebSearch", "AskUserQuestion", "ExitPlanMode", "LSP"}
 
+_SYSTEM_PATHS = ("/etc/", "/usr/", "/bin/", "/sbin/", "/boot/", "/sys/", "/proc/")
+_CONFIG_EXTS = (".env", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf")
+_CONFIG_NAMES = ("dockerfile", "makefile", ".gitignore", ".gitconfig", "requirements.txt")
+
+
+def _file_action_type(path: str) -> str:
+    p = path.lower()
+    if any(p.startswith(s) for s in _SYSTEM_PATHS):
+        return "file_write:system"
+    if any(p.endswith(e) for e in _CONFIG_EXTS) or any(p.endswith(n) for n in _CONFIG_NAMES):
+        return "file_write:config"
+    return "file_write:code"
+
 
 def _bash_action_type(command: str) -> str:
     cmd = command.strip().lower()
     danger_prefixes = ("rm ", "rm\t", "rmdir", "sudo rm", "git reset", "git push --force",
                        "git push -f", "drop table", "truncate ", "delete from")
-    write_prefixes = ("git commit", "git push", "git merge", "git rebase", "pip install",
-                      "uv add", "npm install", "apt ", "brew install", "curl ", "wget ",
-                      "mv ", "cp ", "mkdir", "touch ", "chmod", "chown")
+    git_prefixes = ("git commit", "git push", "git merge", "git rebase")
+    pkg_prefixes = ("pip install", "uv add", "npm install", "apt ", "brew install")
+    shell_prefixes = ("mv ", "cp ", "mkdir", "touch ", "chmod", "chown", "curl ", "wget ")
     read_prefixes = ("ls", "cat ", "head ", "tail ", "grep ", "find ", "git log",
                      "git status", "git diff", "git show", "echo ", "pwd", "which ",
                      "uv run pytest", "uv run python -c")
 
     if any(cmd.startswith(p) for p in danger_prefixes):
         return "file_delete"
-    if any(cmd.startswith(p) for p in write_prefixes):
-        return "bash_write"
+    if any(cmd.startswith(p) for p in git_prefixes):
+        return "bash_write:git"
+    if any(cmd.startswith(p) for p in pkg_prefixes):
+        return "bash_write:package_manager"
+    if any(cmd.startswith(p) for p in shell_prefixes):
+        return "bash_write:shell"
     if any(cmd.startswith(p) for p in read_prefixes):
         return "bash_read"
-    return "bash_write"
+    return "bash_write:shell"
 
 
 def _get_action_type(tool_name: str, tool_input: dict) -> str:
     if tool_name == "Bash":
         return _bash_action_type(tool_input.get("command", ""))
-    return _TOOL_TO_ACTION_TYPE.get(tool_name, "bash_write")
+    if tool_name in ("Write", "Edit", "NotebookEdit"):
+        path = tool_input.get("file_path", "") or tool_input.get("notebook_path", "")
+        return _file_action_type(path)
+    return _TOOL_TO_ACTION_TYPE.get(tool_name, "bash_write:shell")
 
 
 def _get_description(tool_name: str, tool_input: dict) -> str:
