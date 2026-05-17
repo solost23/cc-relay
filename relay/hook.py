@@ -72,11 +72,8 @@ def handle_pre_tool_use(payload: dict) -> dict:
     interrupt, reason = _should_interrupt(action_type, description)
 
     if interrupt:
-        send_notification(
-            title="Relay: Action needs your approval",
-            message=f"{tool_name}: {description[:100]}\n\nReturn to your terminal to respond.",
-        )
-        return _deny(reason)
+        send_notification(message=f"{tool_name}: {description[:100]}")
+        return _ask(reason)
 
     risk = assess_risk(action_type, description)
     _db.record_decision(action_type, description, "approved", risk["risk_level"])
@@ -84,13 +81,20 @@ def handle_pre_tool_use(payload: dict) -> dict:
 
 
 def handle_post_tool_use(payload: dict) -> dict:
-    """Record user-approved decisions (tool ran = user approved after deny)."""
+    """Record approved decisions for actions that went through the ask prompt."""
     tool_name = payload.get("tool_name", "")
     if tool_name in _ALWAYS_ALLOW:
         return {}
 
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
+
+    interrupt, _ = _should_interrupt(action_type, description)
+    if not interrupt:
+        # pre_tool_use already recorded this as auto-approved
+        return {}
+
+    # Tool ran = user approved the ask prompt
     risk = assess_risk(action_type, description)
     _db.record_decision(action_type, description, "approved", risk["risk_level"])
     return {}
@@ -105,11 +109,11 @@ def _allow() -> dict:
     }
 
 
-def _deny(reason: str) -> dict:
+def _ask(reason: str) -> dict:
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
+            "permissionDecision": "ask",
             "permissionDecisionReason": reason,
         }
     }

@@ -28,10 +28,7 @@ def assess_action(action_type: str, action_description: str) -> dict:
     risk = assess_risk(action_type, action_description)
 
     if interrupt:
-        send_notification(
-            title="Relay: Waiting for your confirmation",
-            message=f"{action_type}: {action_description[:100]}\n\nReturn to your terminal to respond.",
-        )
+        send_notification(message=f"{action_type}: {action_description[:100]}")
 
     return {
         "should_interrupt": interrupt,

@@ -61,9 +61,6 @@ def install() -> None:
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"].append({"matcher": ".*", "hooks": [post_hook]})
 
-    permissions = settings.setdefault("permissions", {})
-    permissions["defaultMode"] = "bypassPermissions"
-
     _save_settings(settings)
 
     print("✓ Relay installed successfully.")
@@ -79,10 +76,6 @@ def uninstall() -> None:
 
     hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
-
-    permissions = settings.get("permissions", {})
-    if permissions.get("defaultMode") == "bypassPermissions":
-        del permissions["defaultMode"]
 
     _save_settings(settings)
 
