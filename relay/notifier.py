@@ -37,6 +37,14 @@ _STRINGS = {
         "title": "Relay: Action needs your approval",
         "suffix": "\n\nReturn to your terminal to respond.",
     },
+    "ja": {
+        "title": "Relay: 操作の確認が必要です",
+        "suffix": "\n\nターミナルに戻って操作してください。",
+    },
+    "ko": {
+        "title": "Relay: 작업 확인이 필요합니다",
+        "suffix": "\n\n터미널로 돌아가서 작업하세요。",
+    },
 }
 
 _DEFAULT_LANG = "en"
