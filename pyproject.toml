@@ -1,0 +1,19 @@
+[project]
+name = "relay"
+version = "0.1.0"
+description = "Intelligent interrupt layer for Claude — learns when to ask, when to proceed"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.102.0",
+    "mcp[cli]>=1.27.1",
+    "plyer>=2.1.0",
+    "pyobjus>=1.2.4",
+]
+
+[project.scripts]
+relay = "relay.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
