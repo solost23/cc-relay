@@ -1,12 +1,9 @@
 import json
 import shutil
-import sys
+import subprocess
 from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
-
-# relay executable path resolved at install time via shutil.which or uvx
-_HOOK_COMMAND = "relay"
 
 
 def _load_settings() -> dict:
@@ -23,13 +20,32 @@ def _save_settings(settings: dict) -> None:
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
 
 
-def _relay_bin() -> str:
-    """Return the command to invoke relay hook subcommands."""
+def _install_relay_tool() -> str:
+    """
+    Ensure relay is installed as a local uv tool and return its binary path.
+    Uses `uv tool install` so the binary lives at ~/.local/bin/relay (or equivalent).
+    """
+    # Check if already installed locally
     found = shutil.which("relay")
     if found:
         return found
-    # Fallback: uvx invocation
-    return "uvx --from git+https://github.com/solost23/relay relay"
+
+    print("  Installing relay as a local tool via uv...")
+    subprocess.run(
+        ["uv", "tool", "install", "git+https://github.com/solost23/relay"],
+        check=True,
+    )
+
+    found = shutil.which("relay")
+    if found:
+        return found
+
+    # Explicit fallback path
+    fallback = Path.home() / ".local" / "bin" / "relay"
+    if fallback.exists():
+        return str(fallback)
+
+    raise RuntimeError("relay binary not found after uv tool install")
 
 
 def is_installed() -> bool:
@@ -48,46 +64,38 @@ def ensure_installed() -> None:
 
 
 def install() -> None:
+    bin_path = _install_relay_tool()
     settings = _load_settings()
-
-    bin_cmd = _relay_bin()
 
     pre_hook = {
         "type": "command",
-        "command": f"{bin_cmd} hook pre",
-        "timeout": 30,
+        "command": f"{bin_path} hook pre",
+        "timeout": 10,
         "statusMessage": "Relay: assessing action...",
     }
 
     post_hook = {
         "type": "command",
-        "command": f"{bin_cmd} hook post",
-        "timeout": 10,
+        "command": f"{bin_path} hook post",
+        "timeout": 5,
     }
 
     hooks = settings.setdefault("hooks", {})
 
-    # PreToolUse — match all tools
-    pre_hooks = hooks.setdefault("PreToolUse", [])
-    # Remove any existing relay entry
-    hooks["PreToolUse"] = [h for h in pre_hooks if "relay" not in json.dumps(h)]
+    hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PreToolUse"].append({"matcher": ".*", "hooks": [pre_hook]})
 
-    # PostToolUse — match all tools
-    post_hooks = hooks.setdefault("PostToolUse", [])
-    hooks["PostToolUse"] = [h for h in post_hooks if "relay" not in json.dumps(h)]
+    hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"].append({"matcher": ".*", "hooks": [post_hook]})
 
-    # Set bypassPermissions so Claude Code doesn't double-prompt
     permissions = settings.setdefault("permissions", {})
     permissions["defaultMode"] = "bypassPermissions"
 
     _save_settings(settings)
 
     print("✓ Relay installed successfully.")
-    print(f"  Settings updated: {_SETTINGS_PATH}")
-    print("  PreToolUse and PostToolUse hooks registered.")
-    print("  Permission mode set to bypassPermissions.")
+    print(f"  Binary: {bin_path}")
+    print(f"  Settings: {_SETTINGS_PATH}")
     print()
     print("Restart Claude Code for changes to take effect.")
 
@@ -99,7 +107,6 @@ def uninstall() -> None:
     hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
 
-    # Restore default permission mode
     permissions = settings.get("permissions", {})
     if permissions.get("defaultMode") == "bypassPermissions":
         del permissions["defaultMode"]
