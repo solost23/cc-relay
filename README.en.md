@@ -47,7 +47,7 @@ Action types are partitioned by path and command, each accumulating approval rat
 
 ## Installation
 
-**Global install** (recommended) — add the following to the `mcpServers` field in **`~/.claude/settings.json`**:
+**Global install** (recommended) — add the following to the `mcpServers` field in **`~/.claude.json`**:
 
 ```json
 {
