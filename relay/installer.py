@@ -1,6 +1,5 @@
 import json
-import shutil
-import subprocess
+import sys
 from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
@@ -20,34 +19,6 @@ def _save_settings(settings: dict) -> None:
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2) + "\n")
 
 
-def _install_relay_tool() -> str:
-    """
-    Ensure relay is installed as a local uv tool and return its binary path.
-    Uses `uv tool install` so the binary lives at ~/.local/bin/relay (or equivalent).
-    """
-    # Check if already installed locally
-    found = shutil.which("relay")
-    if found:
-        return found
-
-    print("  Installing relay as a local tool via uv...")
-    subprocess.run(
-        ["uv", "tool", "install", "git+https://github.com/solost23/relay"],
-        check=True,
-    )
-
-    found = shutil.which("relay")
-    if found:
-        return found
-
-    # Explicit fallback path
-    fallback = Path.home() / ".local" / "bin" / "relay"
-    if fallback.exists():
-        return str(fallback)
-
-    raise RuntimeError("relay binary not found after uv tool install")
-
-
 def is_installed() -> bool:
     """Check if relay hooks are already registered in settings.json."""
     settings = _load_settings()
@@ -64,19 +35,21 @@ def ensure_installed() -> None:
 
 
 def install() -> None:
-    bin_path = _install_relay_tool()
+    # Use the current Python interpreter — same environment relay is already running in
+    python = sys.executable
+
     settings = _load_settings()
 
     pre_hook = {
         "type": "command",
-        "command": f"{bin_path} hook pre",
+        "command": f"{python} -m relay hook pre",
         "timeout": 10,
         "statusMessage": "Relay: assessing action...",
     }
 
     post_hook = {
         "type": "command",
-        "command": f"{bin_path} hook post",
+        "command": f"{python} -m relay hook post",
         "timeout": 5,
     }
 
@@ -94,7 +67,7 @@ def install() -> None:
     _save_settings(settings)
 
     print("✓ Relay installed successfully.")
-    print(f"  Binary: {bin_path}")
+    print(f"  Python: {python}")
     print(f"  Settings: {_SETTINGS_PATH}")
     print()
     print("Restart Claude Code for changes to take effect.")
