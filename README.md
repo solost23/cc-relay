@@ -47,7 +47,7 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
 
 ## 安装
 
-**全局安装**（推荐）——将以下配置添加到 **`~/.claude/claude_desktop_config.json`**：
+**全局安装**（推荐）——将以下内容添加到 **`~/.claude/settings.json`** 的 `mcpServers` 字段：
 
 ```json
 {

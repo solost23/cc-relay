@@ -47,7 +47,7 @@ ask   → ツールを一時停止、デスクトップ通知を送信、Claude 
 
 ## インストール
 
-**グローバルインストール**（推奨）— **`~/.claude/claude_desktop_config.json`** に以下を追加してください：
+**グローバルインストール**（推奨）— **`~/.claude/settings.json`** の `mcpServers` フィールドに以下を追加してください：
 
 ```json
 {
