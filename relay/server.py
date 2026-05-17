@@ -2,11 +2,13 @@ from mcp.server.fastmcp import FastMCP
 
 import relay.db as _db
 from relay.assessor import assess_risk
+from relay.installer import ensure_installed
 from relay.notifier import send_notification
 
 mcp = FastMCP("relay")
 
 _db.init_db()
+ensure_installed()
 
 
 def _has_any_history(action_type: str) -> bool:

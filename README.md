@@ -1,22 +1,22 @@
 # Relay
 
-Relay 是一个 MCP server，为 Claude Code 提供智能中断决策层。它通过学习你的历史审批记录，自动判断哪些操作可以直接执行、哪些需要暂停等待你确认，并在需要确认时发送桌面通知。
+Relay 是一个 Claude Code 智能中断层。它通过 hook 拦截每次工具调用，结合历史审批记录和风险评估，自动决定哪些操作直接执行、哪些需要暂停等你确认，并在需要确认时发送桌面通知。
 
 **核心价值：** 让 AI 任务在后台跑，只在真正需要你决策时才打断你。
 
 ## 工作原理
 
 ```
-Claude 准备执行操作
+Claude 准备执行工具（Write、Bash、Edit 等）
     ↓
-调用 assess_action(action_type, action_description)
+PreToolUse hook 触发 → relay hook pre
     ↓
-Relay 查询历史批准率 + 评估风险等级
+查询历史批准率 + 评估风险等级
     ↓
-should_interrupt = false → Claude 直接执行
-should_interrupt = true  → 发送桌面通知，Claude 暂停等待
+allow → 工具直接执行，自动记录为已批准
+deny  → 工具被拦截，发送桌面通知，Claude 暂停等待
     ↓
-用户回复后，调用 record_decision 记录结果
+用户回复后 Claude 继续，PostToolUse hook 记录结果
     ↓
 历史积累 → 下次同类操作判断更准确
 ```
@@ -25,16 +25,14 @@ should_interrupt = true  → 发送桌面通知，Claude 暂停等待
 
 | 条件 | 结果 |
 |---|---|
-| 高风险操作（删文件、force push、drop 表） | 始终打断 |
+| 高风险操作（删文件、force push、drop 表） | 始终拦截 |
 | 低风险 + 历史批准率 ≥ 90% | 始终直接执行 |
-| 该类型操作首次出现（无历史） | 低风险直接执行，其他打断一次建立基线 |
-| 其他情况 | 历史批准率 < 80% 则打断 |
+| 该类型操作首次出现（无历史） | 低风险直接执行，其他拦截一次建立基线 |
+| 其他情况 | 历史批准率 < 80% 则拦截 |
 
 ## 安装
 
-在你的 Claude Code 配置中添加以下 MCP server 配置：
-
-**`~/.claude/mcp.json`** 或项目的 **`.mcp.json`**：
+将以下配置添加到 **`~/.claude/mcp.json`**：
 
 ```json
 {
@@ -42,17 +40,19 @@ should_interrupt = true  → 发送桌面通知，Claude 暂停等待
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/solost23/relay",
-        "relay"
-      ]
+      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
     }
   }
 }
 ```
 
-重启 Claude Code 后生效，无需手动 clone 仓库。
+重启 Claude Code。Relay 会在首次启动时自动将 hook 注册到 `~/.claude/settings.json`，之后所有工具调用都会经过 relay 的决策层。
+
+## 卸载
+
+```bash
+uvx --from git+https://github.com/solost23/relay relay --uninstall
+```
 
 ## 通知支持
 
@@ -62,78 +62,29 @@ should_interrupt = true  → 发送桌面通知，Claude 暂停等待
 | Linux | `notify-send` | 需要桌面环境，Ubuntu/GNOME 默认已有 |
 | Windows | `plyer` | 开箱即用 |
 
-## MCP 工具说明
+## MCP 工具（可选）
 
-### `assess_action`
+安装 hook 后 relay 已经自动工作，不需要配置 MCP。但如果你想查看统计数据，可以额外配置 MCP server：
 
-在执行任何非只读操作前调用，返回是否需要打断用户。
-
-```
-assess_action(
-    action_type="file_write",
-    action_description="Writing updated config to app.yaml"
-)
-```
-
-返回：
-```json
-{
-  "should_interrupt": true,
-  "risk_level": "medium",
-  "reversible": true,
-  "approval_rate": 0.5,
-  "reason": "No history for 'file_write' yet — asking once to establish baseline."
-}
-```
-
-### `record_decision`
-
-用户回复后必须调用，记录决策结果用于后续学习。
-
-```
-record_decision(
-    action_type="file_write",
-    action_description="Writing updated config to app.yaml",
-    decision="approved",
-    risk_level="medium"
-)
-```
-
-### `get_stats_tool`
-
-查看 Relay 已学习到的统计数据。
+**`~/.claude/mcp.json`**：
 
 ```json
 {
-  "total_decisions": 42,
-  "by_action_type": [
-    { "action_type": "file_write", "total": 20, "approved": 19, "approval_rate": 0.95 },
-    { "action_type": "git_push",   "total": 10, "approved": 10, "approval_rate": 1.0  },
-    { "action_type": "file_delete","total": 12, "approved": 3,  "approval_rate": 0.25 }
-  ]
+  "mcpServers": {
+    "relay": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+    }
+  }
 }
 ```
 
-## action_type 参考
-
-| action_type | 风险 | 示例 |
-|---|---|---|
-| `file_read` | 低 | 读取文件 |
-| `bash_read` | 低 | ls、cat、grep |
-| `git_log` / `git_status` / `git_diff` | 低 | 只读 git 操作 |
-| `db_read` | 低 | SELECT 查询 |
-| `file_write` / `file_create` | 中 | 创建或修改文件 |
-| `bash_write` | 中 | 修改状态的 shell 命令 |
-| `git_commit` / `git_push` | 中 | 提交和推送 |
-| `db_write` / `db_update` | 中 | INSERT、UPDATE |
-| `network_request` | 中 | curl、API 调用 |
-| `file_delete` | 高 | 删除文件 |
-| `git_reset` / `git_force_push` | 高 | 破坏性 git 操作 |
-| `db_drop` | 高 | DROP TABLE、无 WHERE 的 DELETE |
+然后在 Claude Code 里调用 `relay__get_stats_tool` 查看审批统计。
 
 ## 已知限制
 
-Relay 在 `--dangerously-skip-permissions` 或 `bypassPermissions` 模式下不生效。这两种模式下 Claude 跳过推理循环直接执行工具，`assess_action` 不会被调用。
+Relay hook 在 `--dangerously-skip-permissions` 模式下不生效（该模式完全跳过 hook 机制）。relay 安装时设置的 `bypassPermissions` 是让 Claude Code 不弹确认框，hook 仍然正常触发。
 
 ## 本地开发
 
