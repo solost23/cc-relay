@@ -21,10 +21,10 @@ def _save_settings(settings: dict) -> None:
 
 def is_installed() -> bool:
     """Check if relay hooks are registered at the current version."""
-    ver = version("relay")
+    ver = version("cc-relay")
     settings = _load_settings()
     for hook_list in settings.get("hooks", {}).get("PreToolUse", []):
-        if f"relay=={ver}" in json.dumps(hook_list):
+        if f"cc-relay=={ver}" in json.dumps(hook_list):
             return True
     return False
 
@@ -38,17 +38,17 @@ def ensure_installed() -> None:
 def install() -> None:
     settings = _load_settings()
 
-    ver = version("relay")
+    ver = version("cc-relay")
     pre_hook = {
         "type": "command",
-        "command": f"uvx relay=={ver} hook pre",
+        "command": f"uvx cc-relay=={ver} hook pre",
         "timeout": 10,
         "statusMessage": "Relay: assessing action...",
     }
 
     post_hook = {
         "type": "command",
-        "command": f"uvx relay=={ver} hook post",
+        "command": f"uvx cc-relay=={ver} hook post",
         "timeout": 5,
     }
 
