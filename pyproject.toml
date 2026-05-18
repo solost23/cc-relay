@@ -21,6 +21,10 @@ Repository = "https://github.com/solost23/cc-relay"
 [project.scripts]
 cc-relay = "cc_relay.server:main"
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",

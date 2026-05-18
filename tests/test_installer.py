@@ -23,9 +23,9 @@ def test_install_writes_versioned_hooks(settings_file):
     pre_hooks = json.dumps(data["hooks"]["PreToolUse"])
     post_hooks = json.dumps(data["hooks"]["PostToolUse"])
     from importlib.metadata import version
-    ver = version("relay")
-    assert f"relay=={ver}" in pre_hooks
-    assert f"relay=={ver}" in post_hooks
+    ver = version("cc-relay")
+    assert f"cc-relay=={ver}" in pre_hooks
+    assert f"cc-relay=={ver}" in post_hooks
 
 
 def test_is_installed_true_after_install(settings_file):
@@ -53,10 +53,10 @@ def test_ensure_installed_upgrades_stale_version(settings_file):
     }))
     ensure_installed()
     from importlib.metadata import version
-    ver = version("relay")
+    ver = version("cc-relay")
     data = json.loads(settings_file.read_text())
     pre_hooks = json.dumps(data["hooks"]["PreToolUse"])
-    assert f"relay=={ver}" in pre_hooks
+    assert f"cc-relay=={ver}" in pre_hooks
     assert "relay==0.0.1" not in pre_hooks
 
 
