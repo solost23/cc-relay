@@ -55,7 +55,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["relay"]
+      "args": ["cc-relay"]
     }
   }
 }
@@ -69,7 +69,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["relay"]
+      "args": ["cc-relay"]
     }
   }
 }
@@ -80,7 +80,7 @@ Restart Claude Code. Relay will automatically register its hooks into `~/.claude
 ## Uninstall
 
 ```bash
-uvx relay --uninstall
+uvx cc-relay --uninstall
 ```
 
 ## Notification support
@@ -104,8 +104,8 @@ Relay hooks do not fire in `--dangerously-skip-permissions` mode (that mode bypa
 ## Local development
 
 ```bash
-git clone https://github.com/solost23/relay
-cd relay
+git clone https://github.com/solost23/cc-relay
+cd cc-relay
 uv sync
 uv run pytest
 uv run mcp dev relay/server.py
