@@ -3,9 +3,17 @@ _HIGH_RISK_TYPES = {
     "db_drop",
     "git_reset",
     "git_force_push",
+    "git_rebase",
+    "git_amend",
     "rm_rf",
     "process_kill",
     "file_write:system",
+    "env_write",
+    "secret_write",
+    "permission_change",
+    "network_send",
+    "ci_cd_modify",
+    "cron_write",
 }
 
 _LOW_RISK_TYPES = {

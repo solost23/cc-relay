@@ -41,8 +41,19 @@ def test_assess_medium_risk_high_approval_proceeds(isolated_db):
 
 
 def test_assess_medium_risk_low_approval_interrupts(isolated_db):
-    for _ in range(5):
+    # 10 samples but only 70% approval — below the 85% threshold
+    for _ in range(7):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    for _ in range(3):
         db_module.record_decision("file_write", "write x", "rejected", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
+    assert result["should_interrupt"] is True
+
+
+def test_assess_medium_risk_insufficient_samples_interrupts(isolated_db):
+    # 5 samples (below MIN_SAMPLES_MEDIUM=10) — should still interrupt
+    for _ in range(5):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
     result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is True
 

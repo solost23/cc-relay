@@ -55,7 +55,7 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+      "args": ["relay"]
     }
   }
 }
@@ -69,7 +69,7 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+      "args": ["relay"]
     }
   }
 }
@@ -80,7 +80,7 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
 ## 卸载
 
 ```bash
-uvx --from git+https://github.com/solost23/relay relay --uninstall
+uvx relay --uninstall
 ```
 
 ## 通知支持

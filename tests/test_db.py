@@ -64,6 +64,17 @@ def test_get_stats_empty(db):
     assert stats["by_action_type"] == []
 
 
+def test_approval_rate_respects_window(db):
+    # Insert 60 records: first 50 rejected, last 10 approved.
+    # Window is 50 most recent, so rate should be 10/50 = 0.2
+    for _ in range(50):
+        record_decision("bash_write", "old cmd", "rejected", "medium")
+    for _ in range(10):
+        record_decision("bash_write", "new cmd", "approved", "medium")
+    rate = get_approval_rate("bash_write")
+    assert abs(rate - 10 / 50) < 0.001
+
+
 def test_get_stats_populated(db):
     record_decision("file_write", "a", "approved", "medium")
     record_decision("file_write", "b", "approved", "medium")

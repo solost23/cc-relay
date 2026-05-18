@@ -55,7 +55,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+      "args": ["relay"]
     }
   }
 }
@@ -69,7 +69,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/solost23/relay", "relay"]
+      "args": ["relay"]
     }
   }
 }
@@ -80,7 +80,7 @@ Restart Claude Code. Relay will automatically register its hooks into `~/.claude
 ## Uninstall
 
 ```bash
-uvx --from git+https://github.com/solost23/relay relay --uninstall
+uvx relay --uninstall
 ```
 
 ## Notification support

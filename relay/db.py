@@ -39,21 +39,19 @@ def record_decision(
         )
 
 
+_APPROVAL_RATE_WINDOW = 50  # only consider the most recent N decisions per action type
+
+
 def get_approval_rate(action_type: str, db_path: Path | None = None) -> float:
     with sqlite3.connect(_db_path(db_path)) as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM decisions WHERE action_type = ?", (action_type,)
-        ).fetchone()
-        total = row[0]
-        if total == 0:
+        rows = conn.execute(
+            "SELECT decision FROM decisions WHERE action_type = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (action_type, _APPROVAL_RATE_WINDOW),
+        ).fetchall()
+        if not rows:
             return 0.5
-
-        row = conn.execute(
-            "SELECT COUNT(*) FROM decisions WHERE action_type = ? AND decision = 'approved'",
-            (action_type,),
-        ).fetchone()
-        approved = row[0]
-        return approved / total
+        approved = sum(1 for (d,) in rows if d == "approved")
+        return approved / len(rows)
 
 
 def get_stats(db_path: Path | None = None) -> dict:

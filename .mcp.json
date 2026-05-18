@@ -4,8 +4,6 @@
       "type": "stdio",
       "command": "uvx",
       "args": [
-        "--from",
-        "git+https://github.com/solost23/relay",
         "relay"
       ]
     }

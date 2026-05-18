@@ -2,6 +2,8 @@
 name = "relay"
 version = "0.1.0"
 description = "Intelligent interrupt layer for Claude — learns when to ask, when to proceed"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.102.0",
@@ -9,6 +11,10 @@ dependencies = [
     "plyer>=2.1.0",
     "pyobjus>=1.2.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/solost23/relay"
+Repository = "https://github.com/solost23/relay"
 
 [project.scripts]
 relay = "relay.server:main"

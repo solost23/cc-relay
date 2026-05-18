@@ -2,7 +2,11 @@ from relay.assessor import assess_risk
 
 
 def test_high_risk_types():
-    for t in ("file_delete", "db_drop", "git_reset", "git_force_push", "rm_rf"):
+    for t in (
+        "file_delete", "db_drop", "git_reset", "git_force_push", "rm_rf",
+        "git_rebase", "git_amend", "env_write", "secret_write",
+        "permission_change", "network_send", "ci_cd_modify", "cron_write",
+    ):
         r = assess_risk(t, "some action")
         assert r["risk_level"] == "high", f"{t} should be high"
         assert r["reversible"] is False
