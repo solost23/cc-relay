@@ -1,6 +1,6 @@
 [project]
 name = "cc-relay"
-version = "0.1.3"
+version = "0.1.4"
 description = "Intelligent interrupt layer for Claude — learns when to ask, when to proceed"
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,7 +19,7 @@ Homepage = "https://github.com/solost23/cc-relay"
 Repository = "https://github.com/solost23/cc-relay"
 
 [project.scripts]
-cc-relay = "cc_relay.server:main"
+cc-relay = "cc_relay.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
