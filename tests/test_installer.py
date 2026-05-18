@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-import relay.installer as installer_module
-from relay.installer import ensure_installed, install, is_installed, uninstall
+import cc_relay.installer as installer_module
+from cc_relay.installer import ensure_installed, install, is_installed, uninstall
 
 
 @pytest.fixture

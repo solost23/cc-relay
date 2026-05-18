@@ -3,8 +3,8 @@ import tempfile
 
 import pytest
 
-from relay.db import get_approval_rate, get_recent_decisions, get_stats, init_db, record_decision
-import relay.db as db_module
+from cc_relay.db import get_approval_rate, get_recent_decisions, get_stats, init_db, record_decision
+import cc_relay.db as db_module
 
 
 @pytest.fixture

@@ -6,29 +6,29 @@ def main() -> None:
 
     if not args:
         # Default: start MCP server
-        from relay.server import main as serve
+        from cc_relay.server import main as serve
         serve()
         return
 
     cmd = args[0]
 
     if cmd == "--install":
-        from relay.installer import install
+        from cc_relay.installer import install
         install()
 
     elif cmd == "--uninstall":
-        from relay.installer import uninstall
+        from cc_relay.installer import uninstall
         uninstall()
 
     elif cmd == "hook" and len(args) >= 2:
-        from relay.db import init_db
+        from cc_relay.db import init_db
         init_db()
         subcommand = args[1]
         if subcommand == "pre":
-            from relay.hook import run_pre_tool_use
+            from cc_relay.hook import run_pre_tool_use
             run_pre_tool_use()
         elif subcommand == "post":
-            from relay.hook import run_post_tool_use
+            from cc_relay.hook import run_post_tool_use
             run_post_tool_use()
         else:
             print(f"Unknown hook subcommand: {subcommand}", file=sys.stderr)

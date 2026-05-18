@@ -2,8 +2,8 @@ import pathlib
 
 import pytest
 
-import relay.db as db_module
-from relay.server import assess_action, record_decision
+import cc_relay.db as db_module
+from cc_relay.server import assess_action, record_decision
 
 
 @pytest.fixture(autouse=True)

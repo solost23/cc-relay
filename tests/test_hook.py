@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from relay.hook import handle_pre_tool_use, handle_post_tool_use, _file_action_type, _bash_action_type
+from cc_relay.hook import handle_pre_tool_use, handle_post_tool_use, _file_action_type, _bash_action_type
 
 
 def _pre(tool_name, tool_input=None):
@@ -68,17 +68,17 @@ def test_always_allow_post_returns_empty():
 # --- auto-approve path ---
 
 def test_auto_approved_action_returns_allow():
-    with patch("relay.hook._should_interrupt", return_value=(False, "auto")), \
-         patch("relay.hook._db.record_decision") as mock_record, \
-         patch("relay.hook.assess_risk", return_value={"risk_level": "low", "reversible": True, "reason": ""}):
+    with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook.assess_risk", return_value={"risk_level": "low", "reversible": True, "reason": ""}):
         result = _pre("Bash", {"command": "git status"})
         assert _decision(result) == "allow"
         mock_record.assert_called_once()
 
 
 def test_auto_approved_post_does_not_double_record():
-    with patch("relay.hook._should_interrupt", return_value=(False, "auto")), \
-         patch("relay.hook._db.record_decision") as mock_record:
+    with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record:
         result = _post("Bash", {"command": "git status"})
         assert result == {}
         mock_record.assert_not_called()
@@ -87,31 +87,31 @@ def test_auto_approved_post_does_not_double_record():
 # --- interrupt path ---
 
 def test_interrupt_returns_ask():
-    with patch("relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("relay.hook.send_notification"):
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook.send_notification"):
         result = _pre("Bash", {"command": "rm -rf /"})
         assert _decision(result) == "ask"
 
 
 def test_interrupt_includes_reason():
-    with patch("relay.hook._should_interrupt", return_value=(True, "dangerous op")), \
-         patch("relay.hook.send_notification"):
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "dangerous op")), \
+         patch("cc_relay.hook.send_notification"):
         result = _pre("Bash", {"command": "rm -rf /"})
         reason = result["hookSpecificOutput"].get("permissionDecisionReason")
         assert reason == "dangerous op"
 
 
 def test_interrupt_fires_notification():
-    with patch("relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("relay.hook.send_notification") as mock_notify:
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook.send_notification") as mock_notify:
         _pre("Write", {"file_path": "/etc/hosts"})
         mock_notify.assert_called_once()
 
 
 def test_post_records_when_interrupted_and_tool_ran():
-    with patch("relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("relay.hook._db.record_decision") as mock_record, \
-         patch("relay.hook.assess_risk", return_value={"risk_level": "high", "reversible": False, "reason": ""}):
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook.assess_risk", return_value={"risk_level": "high", "reversible": False, "reason": ""}):
         result = _post("Bash", {"command": "rm -rf /"})
         assert result == {}
         mock_record.assert_called_once_with(

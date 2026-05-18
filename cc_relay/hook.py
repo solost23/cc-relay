@@ -1,10 +1,10 @@
 import json
 import sys
 
-import relay.db as _db
-from relay.assessor import assess_risk
-from relay.decision import should_interrupt as _should_interrupt
-from relay.notifier import send_notification
+import cc_relay.db as _db
+from cc_relay.assessor import assess_risk
+from cc_relay.decision import should_interrupt as _should_interrupt
+from cc_relay.notifier import send_notification
 
 # Map Claude Code tool names to relay action_type
 _TOOL_TO_ACTION_TYPE = {

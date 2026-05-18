@@ -1,4 +1,4 @@
-from relay.assessor import assess_risk
+from cc_relay.assessor import assess_risk
 
 
 def test_high_risk_types():

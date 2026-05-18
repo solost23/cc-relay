@@ -15,12 +15,11 @@ dependencies = [
 macos = ["pyobjus>=1.2.4"]
 
 [project.urls]
-Homepage = "https://github.com/solost23/relay"
-Repository = "https://github.com/solost23/relay"
+Homepage = "https://github.com/solost23/cc-relay"
+Repository = "https://github.com/solost23/cc-relay"
 
 [project.scripts]
-relay = "relay.server:main"
-cc-relay = "relay.server:main"
+cc-relay = "cc_relay.server:main"
 
 [dependency-groups]
 dev = [

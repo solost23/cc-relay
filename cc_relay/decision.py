@@ -1,5 +1,5 @@
-from relay.assessor import assess_risk
-import relay.db as _db
+from cc_relay.assessor import assess_risk
+import cc_relay.db as _db
 
 _MIN_SAMPLES_LOW = 5     # low-risk actions need fewer samples to trust
 _MIN_SAMPLES_MEDIUM = 10  # medium-risk actions need more evidence before auto-approving

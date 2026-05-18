@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: relay
+Version: 0.1.0
+Summary: Intelligent interrupt layer for Claude — learns when to ask, when to proceed
+Requires-Python: >=3.12
+License-File: LICENSE
+Requires-Dist: anthropic>=0.102.0
+Requires-Dist: mcp[cli]>=1.27.1
+Requires-Dist: plyer>=2.1.0
+Requires-Dist: pyobjus>=1.2.4
+Dynamic: license-file

@@ -1,0 +1,3 @@
+[console_scripts]
+cc-relay = relay.server:main
+relay = relay.server:main
