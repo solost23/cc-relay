@@ -22,6 +22,9 @@ def init_db(db_path: Path | None = None) -> Path:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_decisions_type_time ON decisions (action_type, created_at DESC, id DESC)"
+        )
     return p
 
 
@@ -44,14 +47,32 @@ _APPROVAL_RATE_WINDOW = 50  # only consider the most recent N decisions per acti
 
 def get_approval_rate(action_type: str, db_path: Path | None = None) -> float:
     with sqlite3.connect(_db_path(db_path)) as conn:
-        rows = conn.execute(
-            "SELECT decision FROM decisions WHERE action_type = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN decision = 'approved' THEN 1 ELSE 0 END) AS approved
+            FROM (
+                SELECT decision FROM decisions
+                WHERE action_type = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+            )
+            """,
             (action_type, _APPROVAL_RATE_WINDOW),
-        ).fetchall()
-        if not rows:
+        ).fetchone()
+        total, approved = row
+        if not total:
             return 0.5
-        approved = sum(1 for (d,) in rows if d == "approved")
-        return approved / len(rows)
+        return approved / total
+
+
+def get_count(action_type: str, db_path: Path | None = None) -> int:
+    with sqlite3.connect(_db_path(db_path)) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE action_type = ?",
+            (action_type,),
+        ).fetchone()
+        return row[0]
 
 
 def get_stats(db_path: Path | None = None) -> dict:
@@ -59,21 +80,30 @@ def get_stats(db_path: Path | None = None) -> dict:
     with sqlite3.connect(_db_path(db_path)) as conn:
         conn.row_factory = sqlite3.Row
         total = conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0]
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT
                 action_type,
                 COUNT(*) AS total,
-                SUM(CASE WHEN decision = 'approved' THEN 1 ELSE 0 END) AS approved
-            FROM decisions
+                COALESCE(SUM(CASE WHEN rn <= ? AND decision = 'approved' THEN 1 ELSE 0 END), 0) AS window_approved,
+                SUM(CASE WHEN rn <= ? THEN 1 ELSE 0 END) AS window_total
+            FROM (
+                SELECT action_type, decision,
+                       ROW_NUMBER() OVER (PARTITION BY action_type ORDER BY created_at DESC, id DESC) AS rn
+                FROM decisions
+            )
             GROUP BY action_type
             ORDER BY total DESC
-        """).fetchall()
+            """,
+            (_APPROVAL_RATE_WINDOW, _APPROVAL_RATE_WINDOW),
+        ).fetchall()
         by_type = [
             {
                 "action_type": r["action_type"],
                 "total": r["total"],
-                "approved": r["approved"],
-                "approval_rate": round(r["approved"] / r["total"], 3),
+                "window_total": r["window_total"],
+                "window_approved": r["window_approved"],
+                "approval_rate": round(r["window_approved"] / r["window_total"], 3) if r["window_total"] else 0.5,
             }
             for r in rows
         ]

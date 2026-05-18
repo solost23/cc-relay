@@ -9,11 +9,7 @@ _AUTO_APPROVE_RATE_MEDIUM = 0.85
 
 
 def _get_total(action_type: str) -> int:
-    return sum(
-        r["total"]
-        for r in _db.get_stats()["by_action_type"]
-        if r["action_type"] == action_type
-    )
+    return _db.get_count(action_type)
 
 
 def should_interrupt(action_type: str, description: str) -> tuple[bool, str]:
