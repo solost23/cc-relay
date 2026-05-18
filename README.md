@@ -1,4 +1,4 @@
-# Relay
+# cc-relay
 
 Relay 是一个 Claude Code 智能中断层。它通过 hook 拦截每次工具调用，结合历史审批记录和风险评估，自动决定哪些操作直接执行、哪些需要暂停等你确认，并在需要确认时发送桌面通知。
 
@@ -108,6 +108,6 @@ git clone https://github.com/solost23/cc-relay
 cd cc-relay
 uv sync
 uv run pytest
-uv run mcp dev relay/server.py
+uv run mcp dev cc_relay/server.py
 ```
 

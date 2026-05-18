@@ -1,4 +1,4 @@
-# Relay
+# cc-relay
 
 Relay is an intelligent interrupt layer for Claude Code. It intercepts every tool call via hooks, combines historical approval records with risk assessment, and automatically decides which operations to allow through and which to pause for your confirmation — sending a desktop notification when your input is needed.
 
@@ -108,5 +108,5 @@ git clone https://github.com/solost23/cc-relay
 cd cc-relay
 uv sync
 uv run pytest
-uv run mcp dev relay/server.py
+uv run mcp dev cc_relay/server.py
 ```

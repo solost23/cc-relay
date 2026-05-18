@@ -1,4 +1,4 @@
-# Relay
+# cc-relay
 
 Relay는 Claude Code의 지능형 인터럽트 레이어입니다. 훅을 통해 모든 도구 호출을 가로채고, 과거 승인 기록과 위험도 평가를 결합하여 어떤 작업을 바로 실행하고 어떤 작업을 확인을 위해 일시 중지할지 자동으로 결정합니다. 확인이 필요한 경우 데스크톱 알림을 전송합니다.
 
@@ -108,5 +108,5 @@ git clone https://github.com/solost23/cc-relay
 cd cc-relay
 uv sync
 uv run pytest
-uv run mcp dev relay/server.py
+uv run mcp dev cc_relay/server.py
 ```

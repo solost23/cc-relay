@@ -1,4 +1,4 @@
-# Relay
+# cc-relay
 
 Relay は Claude Code のインテリジェント割り込みレイヤーです。フックを通じてすべてのツール呼び出しをインターセプトし、過去の承認履歴とリスク評価を組み合わせて、どの操作をそのまま実行し、どの操作を確認のために一時停止するかを自動的に判断します。確認が必要な場合はデスクトップ通知を送信します。
 
@@ -108,5 +108,5 @@ git clone https://github.com/solost23/cc-relay
 cd cc-relay
 uv sync
 uv run pytest
-uv run mcp dev relay/server.py
+uv run mcp dev cc_relay/server.py
 ```
