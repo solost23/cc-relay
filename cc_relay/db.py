@@ -76,10 +76,18 @@ def get_approval_rate(action_type: str, db_path: Path | None = None) -> float:
 
 
 def get_count(action_type: str, db_path: Path | None = None) -> int:
+    """Return the number of decisions in the approval-rate window (most recent N)."""
     with sqlite3.connect(_db_path(db_path)) as conn:
         row = conn.execute(
-            "SELECT COUNT(*) FROM decisions WHERE action_type = ?",
-            (action_type,),
+            """
+            SELECT COUNT(*) FROM (
+                SELECT 1 FROM decisions
+                WHERE action_type = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+            )
+            """,
+            (action_type, _APPROVAL_RATE_WINDOW),
         ).fetchone()
         return row[0]
 
@@ -168,13 +176,24 @@ def resolve_pending(
     action_description: str,
     db_path: Path | None = None,
 ) -> None:
-    """Mark the oldest matching pending decision as approved and remove it from pending."""
+    """Mark the oldest matching pending decision as approved and remove it from pending.
+
+    Matches on action_type + description first; falls back to action_type-only
+    so a stale description mismatch never leaves a pending record unresolved.
+    """
     p = _db_path(db_path)
     with sqlite3.connect(p) as conn:
+        # Try exact match first
         row = conn.execute(
             "SELECT id, risk_level FROM pending_decisions WHERE action_type = ? AND action_description = ? ORDER BY id ASC LIMIT 1",
             (action_type, action_description),
         ).fetchone()
+        # Fall back to action_type-only if no exact match
+        if row is None:
+            row = conn.execute(
+                "SELECT id, risk_level FROM pending_decisions WHERE action_type = ? ORDER BY id ASC LIMIT 1",
+                (action_type,),
+            ).fetchone()
         if row is None:
             return
         pending_id, risk_level = row

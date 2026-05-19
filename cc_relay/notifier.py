@@ -60,7 +60,7 @@ def send_notification(message: str, timeout: int = 30) -> bool:
     try:
         system = platform.system()
         if system == "Darwin":
-            safe_msg = (message + s["suffix"]).replace("\\", "\\\\").replace('"', '\\"')
+            safe_msg = (message + s["suffix"]).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "")
             safe_title = s["title"].replace('"', '\\"')
             script = f'display notification "{safe_msg}" with title "{safe_title}"'
             subprocess.Popen(["osascript", "-e", script])

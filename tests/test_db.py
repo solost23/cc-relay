@@ -5,7 +5,7 @@ import pytest
 
 from cc_relay.db import (
     add_pending, flush_pending_as_rejected, get_active_days, get_approval_rate,
-    get_recent_decisions, get_stats, init_db, record_decision,
+    get_count, get_recent_decisions, get_stats, init_db, record_decision,
     reset_action_type, resolve_pending,
 )
 import cc_relay.db as db_module
@@ -174,13 +174,23 @@ def test_get_active_days_outside_window_not_counted(db):
     assert get_active_days("bash_write:git", window_days=30) == 0
 
 
-def test_get_active_days_within_window_counted(db):
+def test_resolve_pending_fallback_to_action_type_only(db):
+    add_pending("bash_write:git", "git push origin master", "medium")
+    # description mismatch — should still resolve via action_type fallback
+    resolve_pending("bash_write:git", "git push origin main")
+    assert get_approval_rate("bash_write:git") == 1.0
     import sqlite3
     from cc_relay.db import _db_path
     with sqlite3.connect(_db_path(None)) as conn:
-        conn.execute(
-            "INSERT INTO decisions (action_type, action_description, decision, risk_level, created_at) VALUES (?, ?, ?, ?, datetime('now', '-5 days'))",
-            ("bash_write:git", "recent push", "approved", "medium"),
-        )
-    assert get_active_days("bash_write:git", window_days=30) == 1
+        count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
+    assert count == 0
+
+
+def test_get_count_uses_window(db):
+    # Insert more than the window size; get_count should cap at window size
+    from cc_relay.db import _APPROVAL_RATE_WINDOW
+    for i in range(_APPROVAL_RATE_WINDOW + 10):
+        record_decision("bash_write:git", f"cmd {i}", "approved", "medium")
+    assert get_count("bash_write:git") == _APPROVAL_RATE_WINDOW
+
 

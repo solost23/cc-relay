@@ -37,6 +37,11 @@ def test_bash_action_type_git():
     assert _bash_action_type("git commit -m 'fix'") == "bash_write:git"
     assert _bash_action_type("git push origin master") == "bash_write:git"
 
+def test_bash_action_type_force_push():
+    assert _bash_action_type("git push --force") == "git_force_push"
+    assert _bash_action_type("git push -f") == "git_force_push"
+    assert _bash_action_type("git push origin --force") == "git_force_push"
+
 def test_bash_action_type_package_manager():
     assert _bash_action_type("uv add requests") == "bash_write:package_manager"
     assert _bash_action_type("npm install lodash") == "bash_write:package_manager"
@@ -56,6 +61,19 @@ def test_bash_action_type_echo_is_not_read():
     # echo can redirect to files — must not be classified as read
     assert _bash_action_type("echo hello > file.txt") != "bash_read"
     assert _bash_action_type("echo hello") != "bash_read"
+
+def test_bash_action_type_chained_escalates_to_highest_risk():
+    # safe prefix followed by dangerous segment → must return the dangerous type
+    assert _bash_action_type("uv run pytest && rm -rf dist") == "file_delete"
+    assert _bash_action_type("git status && git push --force") == "git_force_push"
+    assert _bash_action_type("ls -la; git commit -m 'x'") == "bash_write:git"
+
+def test_bash_action_type_pipe_does_not_downgrade():
+    # piped read commands stay read
+    assert _bash_action_type("git log | grep fix") == "bash_read"
+
+def test_bash_action_type_multiline_escalates():
+    assert _bash_action_type("git status\nrm -rf /tmp/foo") == "file_delete"
 
 
 # --- always-allow tools ---
@@ -82,11 +100,18 @@ def test_auto_approved_action_returns_allow():
 
 
 def test_auto_approved_post_does_not_double_record():
-    with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
-         patch("cc_relay.hook._db.record_decision") as mock_record:
+    with patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook._db.resolve_pending"):
         result = _post("Bash", {"command": "git status"})
         assert result == {}
         mock_record.assert_not_called()
+
+
+def test_post_always_attempts_resolve():
+    # post should call resolve_pending unconditionally, not re-evaluate should_interrupt
+    with patch("cc_relay.hook._db.resolve_pending") as mock_resolve:
+        _post("Bash", {"command": "git status"})
+        mock_resolve.assert_called_once_with("bash_read", "git status")
 
 
 # --- interrupt path ---
