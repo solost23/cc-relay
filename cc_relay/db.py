@@ -25,6 +25,7 @@ def init_db(db_path: Path | None = None) -> Path:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_decisions_type_time ON decisions (action_type, created_at DESC, id DESC)"
         )
+        # pending_decisions kept for schema compatibility; no longer written to
         conn.execute("""
             CREATE TABLE IF NOT EXISTS pending_decisions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,66 +159,39 @@ def get_recent_decisions(
         return [dict(r) for r in rows]
 
 
-def add_pending(
-    action_type: str,
-    action_description: str,
-    risk_level: str,
-    db_path: Path | None = None,
-) -> None:
-    with sqlite3.connect(_db_path(db_path)) as conn:
-        conn.execute(
-            "INSERT INTO pending_decisions (action_type, action_description, risk_level) VALUES (?, ?, ?)",
-            (action_type, action_description, risk_level),
-        )
-
-
-def resolve_pending(
+def approve_latest_rejected(
     action_type: str,
     action_description: str,
     db_path: Path | None = None,
 ) -> None:
-    """Mark the oldest matching pending decision as approved and remove it from pending.
+    """Flip the most recent rejected decision for this action to approved.
 
-    Matches on action_type + description first; falls back to action_type-only
-    so a stale description mismatch never leaves a pending record unresolved.
+    Called from PostToolUse when the tool actually ran (user approved the ask prompt).
+    Falls back to action_type-only match so a stale description never leaves a
+    rejected record uncorrected.
     """
     p = _db_path(db_path)
     with sqlite3.connect(p) as conn:
-        # Try exact match first
         row = conn.execute(
-            "SELECT id, risk_level FROM pending_decisions WHERE action_type = ? AND action_description = ? ORDER BY id ASC LIMIT 1",
+            """
+            SELECT id FROM decisions
+            WHERE action_type = ? AND action_description = ? AND decision = 'rejected'
+            ORDER BY created_at DESC, id DESC LIMIT 1
+            """,
             (action_type, action_description),
         ).fetchone()
-        # Fall back to action_type-only if no exact match
         if row is None:
             row = conn.execute(
-                "SELECT id, risk_level FROM pending_decisions WHERE action_type = ? ORDER BY id ASC LIMIT 1",
+                """
+                SELECT id FROM decisions
+                WHERE action_type = ? AND decision = 'rejected'
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
                 (action_type,),
             ).fetchone()
         if row is None:
             return
-        pending_id, risk_level = row
-        conn.execute("DELETE FROM pending_decisions WHERE id = ?", (pending_id,))
-        conn.execute(
-            "INSERT INTO decisions (action_type, action_description, decision, risk_level) VALUES (?, ?, ?, ?)",
-            (action_type, action_description, "approved", risk_level),
-        )
-
-
-def flush_pending_as_rejected(db_path: Path | None = None) -> int:
-    """Record all pending decisions as rejected (called on session stop). Returns count flushed."""
-    p = _db_path(db_path)
-    with sqlite3.connect(p) as conn:
-        rows = conn.execute(
-            "SELECT action_type, action_description, risk_level FROM pending_decisions"
-        ).fetchall()
-        for action_type, action_description, risk_level in rows:
-            conn.execute(
-                "INSERT INTO decisions (action_type, action_description, decision, risk_level) VALUES (?, ?, ?, ?)",
-                (action_type, action_description, "rejected", risk_level),
-            )
-        conn.execute("DELETE FROM pending_decisions")
-        return len(rows)
+        conn.execute("UPDATE decisions SET decision = 'approved' WHERE id = ?", (row[0],))
 
 
 def reset_action_type(action_type: str, db_path: Path | None = None) -> int:

@@ -8,3 +8,4 @@ CLAUDE.md
 *.egg-info/
 dist/
 build/
+pypi_token

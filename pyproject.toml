@@ -1,6 +1,6 @@
 [project]
 name = "cc-relay"
-version = "0.1.8"
+version = "0.1.9"
 description = "Intelligent interrupt layer for Claude — learns when to ask, when to proceed"
 readme = "README.md"
 license = { text = "MIT" }

@@ -117,7 +117,7 @@ def handle_pre_tool_use(payload: dict) -> dict:
 
     if interrupt:
         risk = assess_risk(action_type, description)
-        _db.add_pending(action_type, description, risk["risk_level"])
+        _db.record_decision(action_type, description, "rejected", risk["risk_level"])
         send_notification(message=f"{tool_name}: {description[:100]}")
         return _ask(reason)
 
@@ -127,7 +127,7 @@ def handle_pre_tool_use(payload: dict) -> dict:
 
 
 def handle_post_tool_use(payload: dict) -> dict:
-    """Resolve pending decisions for actions that went through the ask prompt."""
+    """Flip the pre-recorded rejected decision to approved — tool ran means user approved."""
     tool_name = payload.get("tool_name", "")
     if tool_name in _ALWAYS_ALLOW:
         return {}
@@ -135,16 +135,12 @@ def handle_post_tool_use(payload: dict) -> dict:
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
 
-    # Unconditionally attempt to resolve: resolve_pending is a noop if no pending record exists.
-    # Re-evaluating should_interrupt here is wrong — the decision state may have changed
-    # since pre_tool_use ran, causing pending records to leak.
-    _db.resolve_pending(action_type, description)
+    _db.approve_latest_rejected(action_type, description)
     return {}
 
 
 def handle_stop(payload: dict) -> dict:
-    """Flush all pending decisions as rejected when the session ends."""
-    _db.flush_pending_as_rejected()
+    """No-op: rejections are now written immediately in PreToolUse."""
     return {}
 
 

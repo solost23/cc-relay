@@ -4,9 +4,9 @@ import tempfile
 import pytest
 
 from cc_relay.db import (
-    add_pending, flush_pending_as_rejected, get_active_days, get_approval_rate,
+    approve_latest_rejected, get_active_days, get_approval_rate,
     get_count, get_recent_decisions, get_stats, init_db, record_decision,
-    reset_action_type, resolve_pending,
+    reset_action_type,
 )
 import cc_relay.db as db_module
 
@@ -90,48 +90,32 @@ def test_get_stats_populated(db):
     assert types["file_delete"]["approval_rate"] == 0.0
 
 
-# --- pending decisions ---
+# --- approve_latest_rejected ---
 
-def test_resolve_pending_records_approved(db):
-    add_pending("file_delete", "rm foo", "high")
-    resolve_pending("file_delete", "rm foo")
+def test_approve_latest_rejected_flips_to_approved(db):
+    record_decision("file_delete", "rm foo", "rejected", "high")
+    approve_latest_rejected("file_delete", "rm foo")
     assert get_approval_rate("file_delete") == 1.0
-    assert get_approval_rate("file_delete") == 1.0  # only one record
 
 
-def test_resolve_pending_fifo(db):
-    add_pending("bash_write:git", "git push", "medium")
-    add_pending("bash_write:git", "git push", "medium")
-    resolve_pending("bash_write:git", "git push")
-    # one resolved as approved, one still pending
-    from cc_relay.db import _db_path
-    import sqlite3
-    with sqlite3.connect(_db_path(None)) as conn:
-        count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
-    assert count == 1
-    assert get_approval_rate("bash_write:git") == 1.0
+def test_approve_latest_rejected_picks_most_recent(db):
+    record_decision("bash_write:git", "git push", "rejected", "medium")
+    record_decision("bash_write:git", "git push", "rejected", "medium")
+    approve_latest_rejected("bash_write:git", "git push")
+    # one approved, one still rejected → rate = 0.5
+    assert abs(get_approval_rate("bash_write:git") - 0.5) < 0.001
 
 
-def test_resolve_pending_no_match_is_noop(db):
-    resolve_pending("file_delete", "rm nonexistent")
+def test_approve_latest_rejected_no_match_is_noop(db):
+    approve_latest_rejected("file_delete", "rm nonexistent")
     assert get_approval_rate("file_delete") == 0.5  # no records
 
 
-def test_flush_pending_as_rejected(db):
-    add_pending("file_delete", "rm a", "high")
-    add_pending("file_delete", "rm b", "high")
-    add_pending("bash_write:git", "git push", "medium")
-    count = flush_pending_as_rejected()
-    assert count == 3
-    assert get_approval_rate("file_delete") == 0.0
-    assert get_approval_rate("bash_write:git") == 0.0
-
-
-def test_flush_pending_clears_table(db):
-    add_pending("file_delete", "rm x", "high")
-    flush_pending_as_rejected()
-    # second flush should return 0
-    assert flush_pending_as_rejected() == 0
+def test_approve_latest_rejected_fallback_to_action_type_only(db):
+    record_decision("bash_write:git", "git push origin master", "rejected", "medium")
+    # description mismatch — should still resolve via action_type fallback
+    approve_latest_rejected("bash_write:git", "git push origin main")
+    assert get_approval_rate("bash_write:git") == 1.0
 
 
 # --- reset ---
@@ -175,15 +159,10 @@ def test_get_active_days_outside_window_not_counted(db):
 
 
 def test_resolve_pending_fallback_to_action_type_only(db):
-    add_pending("bash_write:git", "git push origin master", "medium")
+    record_decision("bash_write:git", "git push origin master", "rejected", "medium")
     # description mismatch — should still resolve via action_type fallback
-    resolve_pending("bash_write:git", "git push origin main")
+    approve_latest_rejected("bash_write:git", "git push origin main")
     assert get_approval_rate("bash_write:git") == 1.0
-    import sqlite3
-    from cc_relay.db import _db_path
-    with sqlite3.connect(_db_path(None)) as conn:
-        count = conn.execute("SELECT COUNT(*) FROM pending_decisions").fetchone()[0]
-    assert count == 0
 
 
 def test_get_count_uses_window(db):

@@ -101,24 +101,23 @@ def test_auto_approved_action_returns_allow():
 
 def test_auto_approved_post_does_not_double_record():
     with patch("cc_relay.hook._db.record_decision") as mock_record, \
-         patch("cc_relay.hook._db.resolve_pending"):
+         patch("cc_relay.hook._db.approve_latest_rejected"):
         result = _post("Bash", {"command": "git status"})
         assert result == {}
         mock_record.assert_not_called()
 
 
-def test_post_always_attempts_resolve():
-    # post should call resolve_pending unconditionally, not re-evaluate should_interrupt
-    with patch("cc_relay.hook._db.resolve_pending") as mock_resolve:
+def test_post_always_attempts_approve():
+    with patch("cc_relay.hook._db.approve_latest_rejected") as mock_approve:
         _post("Bash", {"command": "git status"})
-        mock_resolve.assert_called_once_with("bash_read", "git status")
+        mock_approve.assert_called_once_with("bash_read", "git status")
 
 
 # --- interrupt path ---
 
 def test_interrupt_returns_ask():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("cc_relay.hook._db.add_pending"), \
+         patch("cc_relay.hook._db.record_decision"), \
          patch("cc_relay.hook.send_notification"):
         result = _pre("Bash", {"command": "rm -rf /"})
         assert _decision(result) == "ask"
@@ -126,7 +125,7 @@ def test_interrupt_returns_ask():
 
 def test_interrupt_includes_reason():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "dangerous op")), \
-         patch("cc_relay.hook._db.add_pending"), \
+         patch("cc_relay.hook._db.record_decision"), \
          patch("cc_relay.hook.send_notification"):
         result = _pre("Bash", {"command": "rm -rf /"})
         reason = result["hookSpecificOutput"].get("permissionDecisionReason")
@@ -135,33 +134,31 @@ def test_interrupt_includes_reason():
 
 def test_interrupt_fires_notification():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("cc_relay.hook._db.add_pending"), \
+         patch("cc_relay.hook._db.record_decision"), \
          patch("cc_relay.hook.send_notification") as mock_notify:
         _pre("Write", {"file_path": "/etc/hosts"})
         mock_notify.assert_called_once()
 
 
-def test_interrupt_writes_pending():
+def test_interrupt_writes_rejected():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("cc_relay.hook._db.add_pending") as mock_pending, \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
          patch("cc_relay.hook.assess_risk", return_value={"risk_level": "high", "reversible": False, "reason": ""}), \
          patch("cc_relay.hook.send_notification"):
         _pre("Bash", {"command": "rm -rf /"})
-        mock_pending.assert_called_once_with("file_delete", "rm -rf /", "high")
+        mock_record.assert_called_once_with("file_delete", "rm -rf /", "rejected", "high")
 
 
-def test_post_resolves_pending_when_tool_ran():
-    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
-         patch("cc_relay.hook._db.resolve_pending") as mock_resolve:
+def test_post_approves_latest_rejected_when_tool_ran():
+    with patch("cc_relay.hook._db.approve_latest_rejected") as mock_approve:
         result = _post("Bash", {"command": "rm -rf /"})
         assert result == {}
-        mock_resolve.assert_called_once_with("file_delete", "rm -rf /")
+        mock_approve.assert_called_once_with("file_delete", "rm -rf /")
 
 
 # --- stop hook ---
 
-def test_stop_flushes_pending():
-    with patch("cc_relay.hook._db.flush_pending_as_rejected") as mock_flush:
-        handle_stop({})
-        mock_flush.assert_called_once()
+def test_stop_is_noop():
+    result = handle_stop({})
+    assert result == {}
 
