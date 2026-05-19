@@ -16,9 +16,10 @@ PreToolUse hook 触发 → relay hook pre
 查询历史批准率 + 评估风险等级
     ↓
 allow → 工具直接执行，自动记录为已批准
-ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
+ask   → 工具暂停，写入待处理记录，发送桌面通知，Claude Code 弹出确认提示
     ↓
-用户确认后 Claude 继续，PostToolUse hook 记录结果
+用户确认后 Claude 继续，PostToolUse hook 将待处理记录标记为已批准
+用户拒绝后会话结束，Stop hook 将所有未确认记录标记为已拒绝
     ↓
 历史积累 → 下次同类操作判断更准确
 ```
@@ -28,9 +29,13 @@ ask   → 工具暂停，发送桌面通知，Claude Code 弹出确认提示
 | 条件 | 结果 |
 |---|---|
 | 高风险操作（删文件、force push、drop 表、写系统路径） | 始终拦截 |
-| 低风险 + 历史批准率 ≥ 90% | 始终直接执行 |
-| 该类型操作首次出现（无历史） | 低风险直接执行，其他拦截一次建立基线 |
-| 其他情况 | 历史批准率 < 80% 则拦截 |
+| 低风险，样本 < 5 | 直接执行（无需建立基线） |
+| 低风险，样本 ≥ 5，批准率 ≥ 90% | 自动执行 |
+| 中风险，样本不足（自适应阈值：5–12 次，取决于使用频率） | 拦截，建立基线 |
+| 中风险，样本充足，批准率 ≥ 85% | 自动执行 |
+| 其他情况 | 拦截 |
+
+中风险自适应阈值根据过去 30 天的活跃天数动态调整：高频（≥7 天）需 5 次，中频（2–6 天）需 8 次，低频（≤1 天）需 12 次。
 
 操作类型按路径和命令细分，各自独立积累批准率：
 
@@ -95,7 +100,28 @@ uvx cc-relay --uninstall
 
 ## MCP 工具（可选）
 
-安装 hook 后 relay 已经自动工作，不需要额外配置。但如果你想查看统计数据，可以在 Claude Code 里调用 `relay__get_stats_tool` 查看审批统计。
+安装 hook 后 relay 已经自动工作，不需要额外配置。你也可以在 Claude Code 里直接调用以下工具：
+
+| 工具 | 说明 |
+|---|---|
+| `relay__get_stats_tool` | 查看所有操作类型的审批统计 |
+| `relay__get_recent_decisions_tool` | 查看某个操作类型的最近决策记录 |
+| `relay__reset_action_type_tool` | 清除某个操作类型的所有历史，重新建立基线 |
+
+## CLI 命令
+
+```bash
+# 安装 / 卸载 hook
+uvx cc-relay --install
+uvx cc-relay --uninstall
+
+# 查看某操作类型的最近决策（默认 20 条）
+uvx cc-relay --history bash_write:git
+uvx cc-relay --history file_write:code 50
+
+# 清除某操作类型的所有历史
+uvx cc-relay --reset bash_write:git
+```
 
 ## 已知限制
 

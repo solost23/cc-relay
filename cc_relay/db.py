@@ -25,6 +25,15 @@ def init_db(db_path: Path | None = None) -> Path:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_decisions_type_time ON decisions (action_type, created_at DESC, id DESC)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action_type TEXT NOT NULL,
+                action_description TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
     return p
 
 
@@ -71,6 +80,21 @@ def get_count(action_type: str, db_path: Path | None = None) -> int:
         row = conn.execute(
             "SELECT COUNT(*) FROM decisions WHERE action_type = ?",
             (action_type,),
+        ).fetchone()
+        return row[0]
+
+
+def get_active_days(action_type: str, window_days: int = 30, db_path: Path | None = None) -> int:
+    """Return the number of distinct calendar days this action type was seen in the past window_days."""
+    with sqlite3.connect(_db_path(db_path)) as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT date(created_at))
+            FROM decisions
+            WHERE action_type = ?
+              AND created_at >= datetime('now', ? || ' days')
+            """,
+            (action_type, f"-{window_days}"),
         ).fetchone()
         return row[0]
 
@@ -124,3 +148,66 @@ def get_recent_decisions(
             (action_type, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def add_pending(
+    action_type: str,
+    action_description: str,
+    risk_level: str,
+    db_path: Path | None = None,
+) -> None:
+    with sqlite3.connect(_db_path(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO pending_decisions (action_type, action_description, risk_level) VALUES (?, ?, ?)",
+            (action_type, action_description, risk_level),
+        )
+
+
+def resolve_pending(
+    action_type: str,
+    action_description: str,
+    db_path: Path | None = None,
+) -> None:
+    """Mark the oldest matching pending decision as approved and remove it from pending."""
+    p = _db_path(db_path)
+    with sqlite3.connect(p) as conn:
+        row = conn.execute(
+            "SELECT id, risk_level FROM pending_decisions WHERE action_type = ? AND action_description = ? ORDER BY id ASC LIMIT 1",
+            (action_type, action_description),
+        ).fetchone()
+        if row is None:
+            return
+        pending_id, risk_level = row
+        conn.execute("DELETE FROM pending_decisions WHERE id = ?", (pending_id,))
+        conn.execute(
+            "INSERT INTO decisions (action_type, action_description, decision, risk_level) VALUES (?, ?, ?, ?)",
+            (action_type, action_description, "approved", risk_level),
+        )
+
+
+def flush_pending_as_rejected(db_path: Path | None = None) -> int:
+    """Record all pending decisions as rejected (called on session stop). Returns count flushed."""
+    p = _db_path(db_path)
+    with sqlite3.connect(p) as conn:
+        rows = conn.execute(
+            "SELECT action_type, action_description, risk_level FROM pending_decisions"
+        ).fetchall()
+        for action_type, action_description, risk_level in rows:
+            conn.execute(
+                "INSERT INTO decisions (action_type, action_description, decision, risk_level) VALUES (?, ?, ?, ?)",
+                (action_type, action_description, "rejected", risk_level),
+            )
+        conn.execute("DELETE FROM pending_decisions")
+        return len(rows)
+
+
+def reset_action_type(action_type: str, db_path: Path | None = None) -> int:
+    """Delete all decisions for an action type. Returns count deleted."""
+    p = _db_path(db_path)
+    with sqlite3.connect(p) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE action_type = ?", (action_type,)
+        ).fetchone()
+        count = row[0]
+        conn.execute("DELETE FROM decisions WHERE action_type = ?", (action_type,))
+        return count

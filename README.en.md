@@ -16,9 +16,10 @@ PreToolUse hook fires → relay hook pre
 Look up historical approval rate + assess risk level
     ↓
 allow → tool executes immediately, recorded as approved
-ask   → tool pauses, desktop notification sent, Claude Code shows a confirmation prompt
+ask   → tool pauses, pending record written, desktop notification sent, Claude Code shows a confirmation prompt
     ↓
-User confirms → Claude continues, PostToolUse hook records the result
+User confirms → Claude continues, PostToolUse hook marks the pending record as approved
+User rejects → session ends, Stop hook marks all unresolved pending records as rejected
     ↓
 History accumulates → future decisions for the same action type become more accurate
 ```
@@ -28,9 +29,13 @@ History accumulates → future decisions for the same action type become more ac
 | Condition | Result |
 |---|---|
 | High-risk operation (delete files, force push, drop table, write to system paths) | Always interrupt |
-| Low risk + historical approval rate ≥ 90% | Always auto-approve |
-| First occurrence of this action type (no history) | Low risk: auto-approve; others: interrupt once to build baseline |
-| Everything else | Interrupt if approval rate < 80% |
+| Low risk, samples < 5 | Auto-approve (no baseline needed) |
+| Low risk, samples ≥ 5, approval rate ≥ 90% | Auto-approve |
+| Medium risk, insufficient samples (adaptive threshold: 5–12, based on usage frequency) | Interrupt to build baseline |
+| Medium risk, sufficient samples, approval rate ≥ 85% | Auto-approve |
+| Everything else | Interrupt |
+
+The medium-risk adaptive threshold adjusts based on distinct active days in the past 30 days: high-frequency (≥7 days) needs 5 samples, moderate (2–6 days) needs 8, low-frequency (≤1 day) needs 12.
 
 Action types are partitioned by path and command, each accumulating approval rates independently:
 
@@ -95,7 +100,28 @@ Notification text switches automatically based on system language. Currently sup
 
 ## MCP tools (optional)
 
-Once the hook is installed, Relay works automatically with no further configuration. If you want to inspect approval statistics, call `relay__get_stats_tool` inside Claude Code.
+Once the hook is installed, Relay works automatically with no further configuration. You can also call these tools directly inside Claude Code:
+
+| Tool | Description |
+|---|---|
+| `relay__get_stats_tool` | View approval statistics for all action types |
+| `relay__get_recent_decisions_tool` | View recent decision history for a specific action type |
+| `relay__reset_action_type_tool` | Clear all history for an action type and start fresh |
+
+## CLI commands
+
+```bash
+# Install / uninstall hooks
+uvx cc-relay --install
+uvx cc-relay --uninstall
+
+# View recent decisions for an action type (default 20)
+uvx cc-relay --history bash_write:git
+uvx cc-relay --history file_write:code 50
+
+# Clear all history for an action type
+uvx cc-relay --reset bash_write:git
+```
 
 ## Known limitations
 

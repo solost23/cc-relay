@@ -77,6 +77,34 @@ def get_stats_tool() -> dict:
     return _db.get_stats()
 
 
+@mcp.tool()
+def get_recent_decisions_tool(action_type: str, limit: int = 20) -> dict:
+    """
+    Get recent decision history for a specific action type.
+
+    Useful for auditing what relay has learned and debugging auto-approve behavior.
+
+    action_type: the action type to query (e.g. 'file_delete', 'bash_write:git')
+    limit: max number of records to return (default 20)
+    """
+    decisions = _db.get_recent_decisions(action_type, limit)
+    return {"action_type": action_type, "decisions": decisions, "count": len(decisions)}
+
+
+@mcp.tool()
+def reset_action_type_tool(action_type: str) -> dict:
+    """
+    Delete all decision history for a specific action type.
+
+    Use this to reset learned behavior so relay will start building a new baseline
+    from scratch for that action type.
+
+    action_type: the action type to reset (e.g. 'file_delete', 'bash_write:git')
+    """
+    count = _db.reset_action_type(action_type)
+    return {"reset": True, "deleted_count": count, "action_type": action_type}
+
+
 def main() -> None:
     mcp.run()
 

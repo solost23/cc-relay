@@ -40,7 +40,7 @@ def _bash_action_type(command: str) -> str:
     pkg_prefixes = ("pip install", "uv add", "npm install", "apt ", "brew install")
     shell_prefixes = ("mv ", "cp ", "mkdir", "touch ", "chmod", "chown", "curl ", "wget ")
     read_prefixes = ("ls", "cat ", "head ", "tail ", "grep ", "find ", "git log",
-                     "git status", "git diff", "git show", "echo ", "pwd", "which ",
+                     "git status", "git diff", "git show", "pwd", "which ",
                      "uv run pytest", "uv run python -c")
 
     if any(cmd.startswith(p) for p in danger_prefixes):
@@ -89,6 +89,8 @@ def handle_pre_tool_use(payload: dict) -> dict:
     interrupt, reason = _should_interrupt(action_type, description)
 
     if interrupt:
+        risk = assess_risk(action_type, description)
+        _db.add_pending(action_type, description, risk["risk_level"])
         send_notification(message=f"{tool_name}: {description[:100]}")
         return _ask(reason)
 
@@ -98,7 +100,7 @@ def handle_pre_tool_use(payload: dict) -> dict:
 
 
 def handle_post_tool_use(payload: dict) -> dict:
-    """Record approved decisions for actions that went through the ask prompt."""
+    """Resolve pending decisions for actions that went through the ask prompt."""
     tool_name = payload.get("tool_name", "")
     if tool_name in _ALWAYS_ALLOW:
         return {}
@@ -111,9 +113,14 @@ def handle_post_tool_use(payload: dict) -> dict:
         # pre_tool_use already recorded this as auto-approved
         return {}
 
-    # Tool ran = user approved the ask prompt
-    risk = assess_risk(action_type, description)
-    _db.record_decision(action_type, description, "approved", risk["risk_level"])
+    # Tool ran = user approved the ask prompt; resolve the pending record as approved
+    _db.resolve_pending(action_type, description)
+    return {}
+
+
+def handle_stop(payload: dict) -> dict:
+    """Flush all pending decisions as rejected when the session ends."""
+    _db.flush_pending_as_rejected()
     return {}
 
 
@@ -147,3 +154,8 @@ def run_post_tool_use() -> None:
     result = handle_post_tool_use(payload)
     if result:
         print(json.dumps(result))
+
+
+def run_stop() -> None:
+    payload = json.loads(sys.stdin.read())
+    handle_stop(payload)

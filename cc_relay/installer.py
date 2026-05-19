@@ -20,13 +20,13 @@ def _save_settings(settings: dict) -> None:
 
 
 def is_installed() -> bool:
-    """Check if relay hooks are registered at the current version."""
+    """Check if relay hooks are registered at the current version (PreToolUse + Stop)."""
     ver = version("cc-relay")
     settings = _load_settings()
-    for hook_list in settings.get("hooks", {}).get("PreToolUse", []):
-        if f"cc-relay=={ver}" in json.dumps(hook_list):
-            return True
-    return False
+    hooks = settings.get("hooks", {})
+    pre_ok = any(f"cc-relay=={ver}" in json.dumps(h) for h in hooks.get("PreToolUse", []))
+    stop_ok = any(f"cc-relay=={ver}" in json.dumps(h) for h in hooks.get("Stop", []))
+    return pre_ok and stop_ok
 
 
 def ensure_installed() -> None:
@@ -52,6 +52,12 @@ def install() -> None:
         "timeout": 5,
     }
 
+    stop_hook = {
+        "type": "command",
+        "command": f"uvx cc-relay=={ver} hook stop",
+        "timeout": 5,
+    }
+
     hooks = settings.setdefault("hooks", {})
 
     hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
@@ -59,6 +65,9 @@ def install() -> None:
 
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"].append({"matcher": ".*", "hooks": [post_hook]})
+
+    hooks["Stop"] = [h for h in hooks.get("Stop", []) if "relay" not in json.dumps(h)]
+    hooks["Stop"].append({"hooks": [stop_hook]})
 
     _save_settings(settings)
 
@@ -75,6 +84,7 @@ def uninstall() -> None:
 
     hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
+    hooks["Stop"] = [h for h in hooks.get("Stop", []) if "relay" not in json.dumps(h)]
 
     _save_settings(settings)
 
