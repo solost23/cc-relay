@@ -60,7 +60,7 @@ ask   → 工具暂停，写入待处理记录，发送桌面通知，Claude Cod
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }
@@ -74,7 +74,7 @@ ask   → 工具暂停，写入待处理记录，发送桌面通知，Claude Cod
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }

@@ -60,7 +60,7 @@ ask   → 도구 일시 중지, 보류 레코드 기록, 데스크톱 알림 전
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }
@@ -74,7 +74,7 @@ ask   → 도구 일시 중지, 보류 레코드 기록, 데스크톱 알림 전
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }

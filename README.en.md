@@ -60,7 +60,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }
@@ -74,7 +74,7 @@ Action types are partitioned by path and command, each accumulating approval rat
     "relay": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["cc-relay"]
+      "args": ["cc-relay@latest"]
     }
   }
 }
