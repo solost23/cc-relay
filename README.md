@@ -6,6 +6,8 @@
 
 An adaptive interrupt layer for Claude Code. Relay intercepts every tool call via hooks, learns from your approval history, and automatically decides what to let through — only notifying you when a real decision is needed.
 
+**The problem it solves:** when Claude Code needs permission mid-task and you're not at your terminal, it just stalls silently. You come back to find nothing happened. Relay sends a desktop notification the moment it pauses, so you're never left wondering why the task stopped.
+
 **The key idea:** other permission tools use static rules or call an LLM on every action. Relay tracks your actual approval rate per action type and adapts over time. After you approve `git commit` ten times, it stops asking.
 
 [中文](README.zh.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
