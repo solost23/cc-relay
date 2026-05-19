@@ -4,11 +4,9 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An adaptive interrupt layer for Claude Code. Relay intercepts every tool call via hooks, learns from your approval history, and automatically decides what to let through — only notifying you when a real decision is needed.
+An adaptive interrupt layer for Claude Code. Relay intercepts every tool call via hooks, learns from your approval history, and automatically decides what to let through — only interrupting you when a real decision is needed, and sending a desktop notification so you're never left wondering why the task stalled.
 
-**The problem it solves:** when Claude Code needs permission mid-task and you're not at your terminal, it just stalls silently. You come back to find nothing happened. Relay sends a desktop notification the moment it pauses, so you're never left wondering why the task stopped.
-
-**The key idea:** other permission tools use static rules or call an LLM on every action. Relay tracks your actual approval rate per action type and adapts over time. After you approve `git commit` ten times, it stops asking.
+**The key idea:** other permission tools use static rules or call an LLM on every action. Relay tracks your actual approval rate per action type and adapts over time. After you approve `git commit` ten times, it stops asking. High-risk operations always interrupt — everything else gets quieter as you use it.
 
 [中文](README.zh.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 

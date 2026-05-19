@@ -4,11 +4,9 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Relay 是一个 Claude Code 自适应中断层。它通过 hook 拦截每次工具调用，从你的审批历史中学习，自动决定哪些操作直接执行、哪些需要暂停等你确认，并在需要确认时发送桌面通知。
+Relay 是一个 Claude Code 自适应中断层。它通过 hook 拦截每次工具调用，从你的审批历史中学习，自动决定哪些操作直接执行、哪些需要暂停——只在真正需要你决策时才打断你，并发送桌面通知，让你不会错过任何需要处理的时刻。
 
-**它解决的问题：** Claude Code 在任务执行中途需要权限确认时，如果你不在电脑旁，它会直接卡住，什么都不发生。你回来才发现任务早就停了。Relay 在任务暂停的瞬间发送桌面通知，让你不会错过任何需要决策的时刻。
-
-**核心价值：** 让 AI 任务在后台跑，只在真正需要你决策时才打断你。其他权限工具用静态规则或每次调用 LLM 判断，Relay 追踪你对每类操作的实际批准率，随时间自动适应。批准 `git commit` 十次之后，它就不再问了。
+**核心价值：** 其他权限工具用静态规则或每次调用 LLM 判断，Relay 追踪你对每类操作的实际批准率，随时间自动适应。批准 `git commit` 十次之后，它就不再问了。高风险操作始终拦截——其他操作会随着使用越来越安静。
 
 [English](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
