@@ -1,10 +1,24 @@
 # cc-relay
 
-Relay 是一个 Claude Code 智能中断层。它通过 hook 拦截每次工具调用，结合历史审批记录和风险评估，自动决定哪些操作直接执行、哪些需要暂停等你确认，并在需要确认时发送桌面通知。
+[![PyPI version](https://img.shields.io/pypi/v/cc-relay)](https://pypi.org/project/cc-relay/)
+[![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**核心价值：** 让 AI 任务在后台跑，只在真正需要你决策时才打断你。
+Relay 是一个 Claude Code 自适应中断层。它通过 hook 拦截每次工具调用，从你的审批历史中学习，自动决定哪些操作直接执行、哪些需要暂停等你确认，并在需要确认时发送桌面通知。
+
+**核心价值：** 让 AI 任务在后台跑，只在真正需要你决策时才打断你。其他权限工具用静态规则或每次调用 LLM 判断，Relay 追踪你对每类操作的实际批准率，随时间自动适应。批准 `git commit` 十次之后，它就不再问了。
 
 [English](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
+
+## 为什么选 cc-relay
+
+| | 静态白名单 | LLM 分类器 | **cc-relay** |
+|---|---|---|---|
+| 配置成本 | 手动维护规则 | 需要 API Key | 零配置 |
+| 从你的行为学习 | 否 | 否 | **是** |
+| 每次决策成本 | 免费 | ~$0.001/次 | 免费 |
+| 适应你的工作流 | 否 | 否 | **是** |
+| 离线可用 | 是 | 否 | **是** |
 
 ## 工作原理
 

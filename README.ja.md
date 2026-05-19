@@ -1,10 +1,24 @@
 # cc-relay
 
-Relay は Claude Code のインテリジェント割り込みレイヤーです。フックを通じてすべてのツール呼び出しをインターセプトし、過去の承認履歴とリスク評価を組み合わせて、どの操作をそのまま実行し、どの操作を確認のために一時停止するかを自動的に判断します。確認が必要な場合はデスクトップ通知を送信します。
+[![PyPI version](https://img.shields.io/pypi/v/cc-relay)](https://pypi.org/project/cc-relay/)
+[![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**核心的な価値：** AI タスクをバックグラウンドで実行させ、本当に判断が必要なときだけ割り込む。
+Relay は Claude Code の自適応割り込みレイヤーです。フックを通じてすべてのツール呼び出しをインターセプトし、承認履歴から学習して、どの操作をそのまま実行し、どの操作を確認のために一時停止するかを自動的に判断します。確認が必要な場合はデスクトップ通知を送信します。
 
-[中文](README.md) | [English](README.en.md) | [한국어](README.ko.md)
+**核心的な価値：** AI タスクをバックグラウンドで実行させ、本当に判断が必要なときだけ割り込む。他のツールは静的ルールや毎回 LLM を呼び出す方式を使いますが、Relay は操作タイプごとの実際の承認率を追跡し、時間とともに自動的に適応します。`git commit` を 10 回承認すれば、もう聞いてきません。
+
+[中文](README.zh.md) | [English](README.md) | [한국어](README.ko.md)
+
+## なぜ cc-relay か
+
+| | 静的許可リスト | LLM 分類器 | **cc-relay** |
+|---|---|---|---|
+| セットアップ | 手動でルール管理 | API キーが必要 | ゼロ設定 |
+| あなたから学習 | いいえ | いいえ | **はい** |
+| 判断コスト | 無料 | ~$0.001/回 | 無料 |
+| ワークフローに適応 | いいえ | いいえ | **はい** |
+| オフライン動作 | はい | いいえ | **はい** |
 
 ## 仕組み
 

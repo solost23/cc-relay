@@ -1,10 +1,24 @@
 # cc-relay
 
-Relay는 Claude Code의 지능형 인터럽트 레이어입니다. 훅을 통해 모든 도구 호출을 가로채고, 과거 승인 기록과 위험도 평가를 결합하여 어떤 작업을 바로 실행하고 어떤 작업을 확인을 위해 일시 중지할지 자동으로 결정합니다. 확인이 필요한 경우 데스크톱 알림을 전송합니다.
+[![PyPI version](https://img.shields.io/pypi/v/cc-relay)](https://pypi.org/project/cc-relay/)
+[![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**핵심 가치:** AI 작업을 백그라운드에서 실행하고, 실제로 판단이 필요할 때만 알림을 받으세요.
+Relay는 Claude Code의 적응형 인터럽트 레이어입니다. 훅을 통해 모든 도구 호출을 가로채고, 승인 기록에서 학습하여 어떤 작업을 바로 실행하고 어떤 작업을 확인을 위해 일시 중지할지 자동으로 결정합니다. 확인이 필요한 경우 데스크톱 알림을 전송합니다.
 
-[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+**핵심 가치:** AI 작업을 백그라운드에서 실행하고, 실제로 판단이 필요할 때만 알림을 받으세요. 다른 도구들은 정적 규칙이나 매번 LLM을 호출하는 방식을 사용하지만, Relay는 작업 유형별 실제 승인율을 추적하고 시간이 지남에 따라 자동으로 적응합니다. `git commit`을 10번 승인하면 더 이상 묻지 않습니다.
+
+[中文](README.zh.md) | [English](README.md) | [日本語](README.ja.md)
+
+## 왜 cc-relay인가
+
+| | 정적 허용 목록 | LLM 분류기 | **cc-relay** |
+|---|---|---|---|
+| 설정 | 수동 규칙 관리 | API 키 필요 | 설정 불필요 |
+| 학습 여부 | 아니오 | 아니오 | **예** |
+| 결정당 비용 | 무료 | ~$0.001/회 | 무료 |
+| 워크플로 적응 | 아니오 | 아니오 | **예** |
+| 오프라인 동작 | 예 | 아니오 | **예** |
 
 ## 작동 방식
 
