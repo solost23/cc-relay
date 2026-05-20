@@ -94,6 +94,14 @@ def get_count(action_type: str, db_path: Path | None = None) -> float:
     return w_total
 
 
+def get_raw_count(action_type: str, db_path: Path | None = None) -> int:
+    """Return total number of decisions ever recorded for this action type."""
+    with sqlite3.connect(_db_path(db_path)) as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE action_type = ?", (action_type,)
+        ).fetchone()[0]
+
+
 
 def get_stats(db_path: Path | None = None) -> dict:
     """Return approval stats for all action types plus total decision count."""

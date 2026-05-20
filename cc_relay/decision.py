@@ -36,7 +36,10 @@ def should_interrupt(action_type: str, description: str) -> tuple[bool, str]:
         auto_rate = _AUTO_APPROVE_RATE_LOW
 
     if total < min_weight:
-        return True, f"Not enough history for '{action_type}' yet — asking to build baseline."
+        raw = _db.get_raw_count(action_type)
+        if raw == 0:
+            return True, f"No history for '{action_type}' yet — asking to build baseline."
+        return True, f"Recent activity for '{action_type}' has faded — confirming to refresh."
 
     if approval_rate >= auto_rate:
         return False, f"Auto-approved: {approval_rate:.0%} approval rate."
