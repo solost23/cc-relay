@@ -4,7 +4,7 @@ import tempfile
 import pytest
 
 from cc_relay.db import (
-    approve_latest_rejected, get_active_days, get_approval_rate,
+    approve_latest_rejected, get_approval_rate,
     get_count, get_recent_decisions, get_stats, init_db, record_decision,
     reset_action_type,
 )
@@ -39,6 +39,7 @@ def test_approval_rate_mixed(db):
     record_decision("file_write", "write b", "approved", "medium")
     record_decision("file_write", "write c", "rejected", "medium")
     rate = get_approval_rate("file_write")
+    # all inserted at same time → equal weights → 2/3
     assert abs(rate - 2 / 3) < 0.001
 
 
@@ -70,7 +71,7 @@ def test_get_stats_empty(db):
 
 def test_approval_rate_respects_window(db):
     # Insert 60 records: first 50 rejected, last 10 approved.
-    # Window is 50 most recent, so rate should be 10/50 = 0.2
+    # Window is 50 most recent → all same timestamp → rate = 10/50 = 0.2
     for _ in range(50):
         record_decision("bash_write", "old cmd", "rejected", "medium")
     for _ in range(10):
@@ -133,31 +134,6 @@ def test_reset_action_type_nonexistent(db):
     assert count == 0
 
 
-# --- get_active_days ---
-
-def test_get_active_days_no_history(db):
-    assert get_active_days("bash_write:git") == 0
-
-
-def test_get_active_days_counts_distinct_days(db):
-    # 3 records on the same day → still 1 active day
-    for _ in range(3):
-        record_decision("bash_write:git", "git push", "approved", "medium")
-    assert get_active_days("bash_write:git") == 1
-
-
-def test_get_active_days_outside_window_not_counted(db):
-    import sqlite3
-    from cc_relay.db import _db_path
-    # Insert a record 31 days ago directly
-    with sqlite3.connect(_db_path(None)) as conn:
-        conn.execute(
-            "INSERT INTO decisions (action_type, action_description, decision, risk_level, created_at) VALUES (?, ?, ?, ?, datetime('now', '-31 days'))",
-            ("bash_write:git", "old push", "approved", "medium"),
-        )
-    assert get_active_days("bash_write:git", window_days=30) == 0
-
-
 def test_resolve_pending_fallback_to_action_type_only(db):
     record_decision("bash_write:git", "git push origin master", "rejected", "medium")
     # description mismatch — should still resolve via action_type fallback
@@ -166,10 +142,30 @@ def test_resolve_pending_fallback_to_action_type_only(db):
 
 
 def test_get_count_uses_window(db):
-    # Insert more than the window size; get_count should cap at window size
+    # Insert more than the window size; get_count should reflect window cap
     from cc_relay.db import _APPROVAL_RATE_WINDOW
     for i in range(_APPROVAL_RATE_WINDOW + 10):
         record_decision("bash_write:git", f"cmd {i}", "approved", "medium")
-    assert get_count("bash_write:git") == _APPROVAL_RATE_WINDOW
+    # all same timestamp → weight per record ≈ 1.0, sum ≈ window size
+    count = get_count("bash_write:git")
+    assert abs(count - _APPROVAL_RATE_WINDOW) < 0.01
+
+
+def test_old_rejections_decay(db):
+    import sqlite3
+    from cc_relay.db import _db_path
+    # Insert 10 rejections 30 days ago
+    with sqlite3.connect(_db_path(None)) as conn:
+        for _ in range(10):
+            conn.execute(
+                "INSERT INTO decisions (action_type, action_description, decision, risk_level, created_at) VALUES (?, ?, ?, ?, datetime('now', '-30 days'))",
+                ("bash_write:git", "git push", "rejected", "medium"),
+            )
+    # Insert 5 recent approvals
+    for _ in range(5):
+        record_decision("bash_write:git", "git push", "approved", "medium")
+    rate = get_approval_rate("bash_write:git")
+    # Recent approvals should dominate; rate should be well above 0.5
+    assert rate > 0.8
 
 

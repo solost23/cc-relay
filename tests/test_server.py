@@ -1,5 +1,4 @@
 import pathlib
-from unittest.mock import patch
 
 import pytest
 
@@ -34,50 +33,45 @@ def test_assess_medium_risk_no_history_interrupts():
 
 
 def test_assess_medium_risk_high_approval_proceeds(isolated_db):
-    # Simulate high-frequency usage (active_days >= 7 → min_samples = 5)
-    with patch("cc_relay.decision._db.get_active_days", return_value=7):
-        for _ in range(5):
-            db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
-        result = assess_action("file_write", "write something")
+    # 8 approvals (weight ≈ 8.0 > _MIN_WEIGHT_MEDIUM=7.0), 100% rate → auto-approve
+    for _ in range(8):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is False
     assert result["approval_rate"] == 1.0
 
 
 def test_assess_medium_risk_low_approval_interrupts(isolated_db):
     # 12 samples, 70% approval — below the 85% threshold
-    with patch("cc_relay.decision._db.get_active_days", return_value=7):
-        for _ in range(9):
-            db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
-        for _ in range(3):
-            db_module.record_decision("file_write", "write x", "rejected", "medium", isolated_db)
-        result = assess_action("file_write", "write something")
+    for _ in range(9):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    for _ in range(3):
+        db_module.record_decision("file_write", "write x", "rejected", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is True
 
 
 def test_assess_medium_risk_insufficient_samples_interrupts(isolated_db):
-    # 4 samples, high-frequency (min_samples=5) — still not enough
-    with patch("cc_relay.decision._db.get_active_days", return_value=7):
-        for _ in range(4):
-            db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
-        result = assess_action("file_write", "write something")
+    # 4 approvals (weight ≈ 4.0 < _MIN_WEIGHT_MEDIUM=7.0) — not enough
+    for _ in range(4):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is True
 
 
 def test_assess_medium_risk_adaptive_low_frequency(isolated_db):
-    # Low-frequency (active_days=1 → min_samples=12): 8 samples not enough
-    with patch("cc_relay.decision._db.get_active_days", return_value=1):
-        for _ in range(8):
-            db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
-        result = assess_action("file_write", "write something")
+    # 6 approvals (weight ≈ 6.0 < _MIN_WEIGHT_MEDIUM=7.0) — not enough
+    for _ in range(6):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is True
 
 
 def test_assess_medium_risk_adaptive_low_frequency_enough_samples(isolated_db):
-    # Low-frequency (active_days=1 → min_samples=12): 12 samples is enough
-    with patch("cc_relay.decision._db.get_active_days", return_value=1):
-        for _ in range(12):
-            db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
-        result = assess_action("file_write", "write something")
+    # 8 approvals (weight ≈ 8.0 > _MIN_WEIGHT_MEDIUM=7.0) — enough
+    for _ in range(8):
+        db_module.record_decision("file_write", "write x", "approved", "medium", isolated_db)
+    result = assess_action("file_write", "write something")
     assert result["should_interrupt"] is False
 
 

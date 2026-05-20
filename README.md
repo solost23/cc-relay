@@ -43,15 +43,13 @@ History accumulates → same action type gets quieter over time
 | Condition | Result |
 |---|---|
 | High-risk (delete files, force push, drop table, system paths) | Always interrupt |
-| Low risk, < 5 samples | Auto-approve (no baseline needed) |
-| Low risk, ≥ 5 samples, approval rate ≥ 90% | Auto-approve |
-| Medium risk, insufficient samples (adaptive: 5–12 based on usage frequency) | Interrupt to build baseline |
-| Medium risk, sufficient samples, approval rate ≥ 85% | Auto-approve |
+| Low risk, effective weight < 4 | Auto-approve (no baseline needed) |
+| Low risk, effective weight ≥ 4, approval rate ≥ 90% | Auto-approve |
+| Medium risk, effective weight < 7 | Interrupt to build baseline |
+| Medium risk, effective weight ≥ 7, approval rate ≥ 85% | Auto-approve |
 | Everything else | Interrupt |
 
-The medium-risk threshold adapts to how often you use Claude Code: high-frequency users (≥7 active days/month) need only 5 samples; low-frequency users (≤1 day/month) need 12. This prevents premature auto-approval for infrequent users.
-
-Action types are tracked independently, so approving `git commit` doesn't affect the threshold for `npm install`:
+Approval rates use **exponential time decay** (half-life: 7 days) — recent decisions carry more weight than old ones. If you start rejecting an action you previously always approved, the weighted approval rate drops quickly and Relay starts interrupting again within days. Old approvals fade naturally, so the system never gets permanently locked into auto-approve.
 
 | Action type | Description | Risk |
 |---|---|---|
