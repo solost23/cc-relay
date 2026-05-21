@@ -4,7 +4,7 @@ import sys
 import cc_relay.db as _db
 from cc_relay.assessor import assess_risk
 from cc_relay.decision import should_interrupt as _should_interrupt
-from cc_relay.notifier import send_notification
+from cc_relay.notifier import send_notification, send_completion_notification
 
 # Map Claude Code tool names to relay action_type
 _TOOL_TO_ACTION_TYPE = {
@@ -140,7 +140,7 @@ def handle_post_tool_use(payload: dict) -> dict:
 
 
 def handle_stop(payload: dict) -> dict:
-    """No-op: rejections are now written immediately in PreToolUse."""
+    send_completion_notification()
     return {}
 
 

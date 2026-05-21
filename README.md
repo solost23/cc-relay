@@ -33,7 +33,9 @@ allow → tool executes immediately, auto-recorded as approved
 ask   → tool pauses, desktop notification sent, Claude Code shows confirmation prompt
     ↓
 User confirms → Claude continues, PostToolUse marks record as approved
-User rejects  → Stop hook marks all pending records as rejected
+User rejects  → session ends
+    ↓
+Stop hook fires → marks pending records as rejected + sends completion notification
     ↓
 History accumulates → same action type gets quieter over time
 ```
@@ -102,7 +104,10 @@ uvx cc-relay --uninstall
 
 ## Notification support
 
-Notification text auto-switches based on system language (Chinese, English, Japanese, Korean).
+Relay sends two types of desktop notifications. Text auto-switches based on system language (Chinese, English, Japanese, Korean).
+
+- **Interrupt**: when an action needs your approval — prompts you to return to the terminal
+- **Completion**: when Claude finishes responding — so you know the task is done even if you stepped away
 
 | Platform | Implementation | Notes |
 |---|---|---|
