@@ -44,8 +44,15 @@ def _classify_single_command(cmd: str) -> str:
     shell_prefixes = ("mv ", "cp ", "mkdir", "touch ", "chmod", "chown", "curl ", "wget ")
     read_prefixes = ("ls", "cat ", "head ", "tail ", "grep ", "find ", "git log",
                      "git status", "git diff", "git show", "pwd", "which ",
-                     "uv run pytest", "uv run python -c")
+                     "env", "printenv", "ps ",
+                     "ps\t", "df ", "du ", "free", "top ", "htop", "uname",
+                     "date", "whoami", "id ", "id\t", "wc ", "sort ", "uniq ",
+                     "cut ", "awk ", "sed ", "tr ", "xargs ", "tee ",
+                     "uv run pytest", "uv run python -c", "python -c", "python3 -c",
+                     "node -e", "node -p")
 
+    if ">" in cmd:
+        return "bash_write:shell"
     if any(cmd.startswith(p) for p in force_push_prefixes):
         return "git_force_push"
     if any(cmd.startswith(p) for p in danger_prefixes):
