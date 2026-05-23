@@ -20,13 +20,14 @@ def _save_settings(settings: dict) -> None:
 
 
 def is_installed() -> bool:
-    """Check if relay hooks are registered at the current version (PreToolUse + Stop)."""
+    """Check if relay hooks are registered at the current version and relay is first in PreToolUse."""
     ver = version("cc-relay")
     settings = _load_settings()
     hooks = settings.get("hooks", {})
-    pre_ok = any(f"cc-relay=={ver}" in json.dumps(h) for h in hooks.get("PreToolUse", []))
+    pre = hooks.get("PreToolUse", [])
+    pre_first = bool(pre) and f"cc-relay=={ver}" in json.dumps(pre[0])
     stop_ok = any(f"cc-relay=={ver}" in json.dumps(h) for h in hooks.get("Stop", []))
-    return pre_ok and stop_ok
+    return pre_first and stop_ok
 
 
 def ensure_installed() -> None:
@@ -61,7 +62,7 @@ def install() -> None:
     hooks = settings.setdefault("hooks", {})
 
     hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if "relay" not in json.dumps(h)]
-    hooks["PreToolUse"].append({"matcher": ".*", "hooks": [pre_hook]})
+    hooks["PreToolUse"].insert(0, {"matcher": ".*", "hooks": [pre_hook]})
 
     hooks["PostToolUse"] = [h for h in hooks.get("PostToolUse", []) if "relay" not in json.dumps(h)]
     hooks["PostToolUse"].append({"matcher": ".*", "hooks": [post_hook]})
