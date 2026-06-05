@@ -117,6 +117,8 @@ def _get_action_type(tool_name: str, tool_input: dict) -> str:
         return _file_action_type(path)
     if tool_name in _PATCH_TOOLS:
         patch = tool_input.get("patch", "") or tool_input.get("input", "")
+        if not str(patch).strip():
+            return "file_patch:unknown"
         if "delete file" in str(patch).lower():
             return "file_delete"
         return "file_write:code"
@@ -130,7 +132,7 @@ def _get_description(tool_name: str, tool_input: dict) -> str:
         return tool_input.get("file_path", "") or tool_input.get("notebook_path", "")
     if tool_name in _PATCH_TOOLS:
         patch = tool_input.get("patch", "") or tool_input.get("input", "")
-        return str(patch)[:200] or "apply_patch"
+        return str(patch)[:200] or "apply_patch with unavailable patch contents"
     if tool_name in ("Read", "Glob", "Grep"):
         return tool_input.get("file_path", "") or tool_input.get("pattern", "")
     if tool_name in ("WebFetch", "WebSearch"):
@@ -156,7 +158,11 @@ def handle_pre_tool_use(payload: dict, client: str | None = None) -> dict:
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
 
-    interrupt, reason = _should_interrupt(action_type, description)
+    interrupt, reason = _should_interrupt(
+        action_type,
+        description,
+        allow_recent_rejected=client_name == "codex",
+    )
 
     if interrupt:
         risk = assess_risk(action_type, description)

@@ -4,7 +4,7 @@ import tempfile
 import pytest
 
 from cc_relay.db import (
-    approve_latest_rejected, get_approval_rate,
+    approve_latest_rejected, approve_recent_rejected, get_approval_rate,
     get_count, get_recent_decisions, get_stats, init_db, record_decision,
     reset_action_type,
 )
@@ -119,6 +119,18 @@ def test_approve_latest_rejected_fallback_to_action_type_only(db):
     assert get_approval_rate("bash_write:git") == 1.0
 
 
+def test_approve_recent_rejected_requires_exact_description(db):
+    record_decision("bash_write:git", "git commit", "rejected", "medium")
+    assert approve_recent_rejected("bash_write:git", "git push") is False
+    assert get_approval_rate("bash_write:git") == 0.0
+
+
+def test_approve_recent_rejected_flips_exact_match(db):
+    record_decision("bash_write:git", "git commit", "rejected", "medium")
+    assert approve_recent_rejected("bash_write:git", "git commit") is True
+    assert get_approval_rate("bash_write:git") == 1.0
+
+
 # --- reset ---
 
 def test_reset_action_type(db):
@@ -167,5 +179,4 @@ def test_old_rejections_decay(db):
     rate = get_approval_rate("bash_write:git")
     # Recent approvals should dominate; rate should be well above 0.5
     assert rate > 0.8
-
 

@@ -1,5 +1,6 @@
 _HIGH_RISK_TYPES = {
     "file_delete",
+    "file_patch:unknown",
     "db_drop",
     "git_reset",
     "git_force_push",

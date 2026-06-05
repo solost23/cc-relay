@@ -8,13 +8,21 @@ _AUTO_APPROVE_RATE_LOW = 0.9
 _AUTO_APPROVE_RATE_MEDIUM = 0.85
 
 
-def should_interrupt(action_type: str, description: str) -> tuple[bool, str]:
+def should_interrupt(
+    action_type: str,
+    description: str,
+    allow_recent_rejected: bool = False,
+) -> tuple[bool, str]:
     """
     Core decision logic shared by hook and MCP server.
     Returns (interrupt: bool, reason: str).
     """
     risk = assess_risk(action_type, description)
     risk_level = risk["risk_level"]
+
+    if allow_recent_rejected and _db.approve_recent_rejected(action_type, description):
+        return False, "Approved after explicit confirmation of the same blocked action."
+
     approval_rate = _db.get_approval_rate(action_type)
     total = _db.get_count(action_type)
 

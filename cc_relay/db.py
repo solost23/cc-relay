@@ -180,6 +180,32 @@ def approve_latest_rejected(
         conn.execute("UPDATE decisions SET decision = 'approved' WHERE id = ?", (row[0],))
 
 
+def approve_recent_rejected(
+    action_type: str,
+    action_description: str,
+    max_age_seconds: int = 600,
+    db_path: Path | None = None,
+) -> bool:
+    """Approve one recent exact rejected decision for a blocked Codex retry."""
+    p = _db_path(db_path)
+    with sqlite3.connect(p) as conn:
+        row = conn.execute(
+            """
+            SELECT id FROM decisions
+            WHERE action_type = ?
+              AND action_description = ?
+              AND decision = 'rejected'
+              AND created_at >= datetime('now', ?)
+            ORDER BY created_at DESC, id DESC LIMIT 1
+            """,
+            (action_type, action_description, f"-{max_age_seconds} seconds"),
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute("UPDATE decisions SET decision = 'approved' WHERE id = ?", (row[0],))
+        return True
+
+
 def reset_action_type(action_type: str, db_path: Path | None = None) -> int:
     """Delete all decisions for an action type. Returns count deleted."""
     p = _db_path(db_path)

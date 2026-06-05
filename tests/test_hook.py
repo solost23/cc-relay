@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch
 from cc_relay.hook import handle_pre_tool_use, handle_post_tool_use, handle_stop, _file_action_type, _bash_action_type
+import cc_relay.db as db_module
 
 
 def _pre(tool_name, tool_input=None):
@@ -105,6 +106,27 @@ def test_codex_apply_patch_delete_is_file_delete():
         assert mock_record.call_args.args[0] == "file_delete"
 
 
+def test_codex_apply_patch_without_payload_is_unknown_patch():
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "unknown patch")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook.assess_risk", return_value={"risk_level": "high", "reversible": False, "reason": ""}), \
+         patch("cc_relay.hook.send_notification"):
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "apply_patch",
+                "tool_input": {},
+            }
+        )
+        assert result == {"decision": "block", "reason": "unknown patch"}
+        mock_record.assert_called_once_with(
+            "file_patch:unknown",
+            "apply_patch with unavailable patch contents",
+            "rejected",
+            "high",
+        )
+
+
 # --- always-allow tools ---
 
 def test_always_allow_tools_pass_through():
@@ -178,6 +200,25 @@ def test_codex_interrupt_returns_block():
             }
         )
         assert result == {"decision": "block", "reason": "high risk"}
+
+
+def test_codex_repeated_blocked_action_is_allowed_after_confirmation(tmp_path, monkeypatch):
+    test_db = tmp_path / "test.db"
+    db_module.init_db(test_db)
+    monkeypatch.setattr(db_module, "_DEFAULT_DB", test_db)
+
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {"command": "git commit -m 'x'"},
+    }
+
+    with patch("cc_relay.hook.send_notification"):
+        first = handle_pre_tool_use(payload, "codex")
+        second = handle_pre_tool_use(payload, "codex")
+
+    assert first["decision"] == "block"
+    assert second == {}
 
 
 def test_interrupt_includes_reason():
