@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Relay は Claude Code の自適応割り込みレイヤーです。フックを通じてすべてのツール呼び出しをインターセプトし、承認履歴から学習して、どの操作をそのまま実行し、どの操作を一時停止するかを自動的に判断します。本当に判断が必要なときだけ割り込み、デスクトップ通知を送るのでタスクが止まっても気づけます。
+Relay は Claude Code と Codex に対応した自適応割り込みレイヤーです。フックを通じてツール呼び出しをインターセプトし、承認履歴から学習して、どの操作をそのまま実行し、どの操作を一時停止するかを自動的に判断します。本当に判断が必要なときだけ割り込み、デスクトップ通知を送るのでタスクが止まっても気づけます。
 
 **核心的な価値：** 他のツールは静的ルールや毎回 LLM を呼び出す方式を使いますが、Relay は操作タイプごとの実際の承認率を追跡し、時間とともに自動的に適応します。`git commit` を 10 回承認すれば、もう聞いてきません。高リスク操作は常に割り込み——それ以外は使えば使うほど静かになります。
 
@@ -23,16 +23,16 @@ Relay は Claude Code の自適応割り込みレイヤーです。フックを�
 ## 仕組み
 
 ```
-Claude がツールを実行しようとする（Write、Bash、Edit など）
+エージェントがツールを実行しようとする（Write、Bash、Edit、shell command など）
     ↓
 PreToolUse フックが起動 → relay hook pre
     ↓
 過去の承認率を参照 + リスクレベルを評価
     ↓
 allow → ツールをそのまま実行、承認済みとして記録
-ask   → ツールを一時停止、保留レコードを書き込み、デスクトップ通知を送信、Claude Code が確認プロンプトを表示
+interrupt → ツールを一時停止またはブロックし、保留レコードを書き込み、デスクトップ通知を送信、クライアントが判断を要求
     ↓
-ユーザーが確認 → Claude が続行、PostToolUse フックが保留レコードを承認済みとしてマーク
+ユーザーが確認 → エージェントが続行、PostToolUse フックが保留レコードを承認済みとしてマーク
 ユーザーが拒否 → セッション終了
     ↓
 Stop フックが起動 → 保留レコードを拒否済みとしてマーク + タスク完了通知を送信
@@ -68,7 +68,12 @@ Stop フックが起動 → 保留レコードを拒否済みとしてマーク 
 
 ## インストール
 
-**グローバルインストール**（推奨）— **`~/.claude.json`** の `mcpServers` フィールドに以下を追加してください：
+Relay は **Claude Code** と **Codex** の両方をサポートします。MCP server をエージェント設定に追加すると、初回起動時に両方のクライアントのフックが自動的にインストールされます：
+
+- Claude Code フック：`~/.claude/settings.json`
+- Codex フック：`~/.codex/config.toml`
+
+**Claude Code グローバル設定**— **`~/.claude.json`** の `mcpServers` フィールドに以下を追加してください：
 
 ```json
 {
@@ -82,26 +87,21 @@ Stop フックが起動 → 保留レコードを拒否済みとしてマーク 
 }
 ```
 
-**プロジェクト単位のインストール**— プロジェクトルートに **`.mcp.json`** を作成してください：
+**Codex グローバル設定**— **`~/.codex/config.toml`** に以下を追加してください：
 
-```json
-{
-  "mcpServers": {
-    "relay": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["cc-relay@latest"]
-    }
-  }
-}
+```toml
+[mcp_servers.relay]
+type = "stdio"
+command = "uvx"
+args = ["cc-relay@latest"]
 ```
 
-Claude Code を再起動してください。Relay は初回起動時に自動的にフックを `~/.claude/settings.json` に登録します。以降、すべてのツール呼び出しが relay の判断レイヤーを通過します。
+エージェントを再起動してください。Relay は MCP server として起動し、自動的に `--install-all` 相当の処理を実行して、Claude Code と Codex のフックを最新に保ちます。
 
 ## アンインストール
 
 ```bash
-uvx cc-relay --uninstall
+uvx cc-relay --uninstall-all
 ```
 
 ## 通知サポート
@@ -109,7 +109,7 @@ uvx cc-relay --uninstall
 Relay は 2 種類のデスクトップ通知を送信します。通知テキストはシステム言語に応じて自動的に切り替わります。現在のサポート言語：中国語、英語、日本語、韓国語。
 
 - **割り込み通知**：操作の承認が必要なとき——ターミナルに戻るよう促します
-- **完了通知**：Claude が応答を完了したとき——その場を離れていてもタスクの終了を把握できます
+- **完了通知**：エージェントが応答を完了したとき——その場を離れていてもタスクの終了を把握できます
 
 | プラットフォーム | 実装 | 備考 |
 |---|---|---|
@@ -119,7 +119,7 @@ Relay は 2 種類のデスクトップ通知を送信します。通知テキ�
 
 ## MCP ツール（オプション）
 
-フックをインストールすれば Relay は自動的に動作し、追加設定は不要です。Claude Code 内で以下のツールを直接呼び出すこともできます：
+フックをインストールすれば Relay は自動的に動作し、追加設定は不要です。Claude Code または Codex 内で以下のツールを直接呼び出すこともできます：
 
 | ツール | 説明 |
 |---|---|
@@ -130,9 +130,15 @@ Relay は 2 種類のデスクトップ通知を送信します。通知テキ�
 ## CLI コマンド
 
 ```bash
-# フックのインストール / アンインストール
+# Claude Code と Codex のフックを同時にインストール / アンインストール
+uvx cc-relay --install-all
+uvx cc-relay --uninstall-all
+
+# 上級者向け：片方のクライアントだけを管理
 uvx cc-relay --install
+uvx cc-relay --install-codex
 uvx cc-relay --uninstall
+uvx cc-relay --uninstall-codex
 
 # 操作タイプの最近の決定を表示（デフォルト 20 件）
 uvx cc-relay --history bash_write:git

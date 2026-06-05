@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An adaptive interrupt layer for Claude Code. Relay intercepts every tool call via hooks, learns from your approval history, and automatically decides what to let through — only interrupting you when a real decision is needed, and sending a desktop notification so you're never left wondering why the task stalled.
+An adaptive interrupt layer for Claude Code and Codex. Relay intercepts tool calls via hooks, learns from your approval history, and automatically decides what to let through — only interrupting you when a real decision is needed, and sending a desktop notification so you're never left wondering why the task stalled.
 
 **The key idea:** other permission tools use static rules or call an LLM on every action. Relay tracks your actual approval rate per action type and adapts over time. After you approve `git commit` ten times, it stops asking. High-risk operations always interrupt — everything else gets quieter as you use it.
 
@@ -23,16 +23,16 @@ An adaptive interrupt layer for Claude Code. Relay intercepts every tool call vi
 ## How it works
 
 ```
-Claude is about to execute a tool (Write, Bash, Edit, etc.)
+The agent is about to execute a tool (Write, Bash, Edit, shell command, etc.)
     ↓
 PreToolUse hook fires → relay hook pre
     ↓
 Look up historical approval rate + assess risk level
     ↓
 allow → tool executes immediately, auto-recorded as approved
-ask   → tool pauses, desktop notification sent, Claude Code shows confirmation prompt
+interrupt → tool pauses or is blocked, desktop notification sent, client asks for your decision
     ↓
-User confirms → Claude continues, PostToolUse marks record as approved
+User confirms → agent continues, PostToolUse marks record as approved
 User rejects  → session ends
     ↓
 Stop hook fires → marks pending records as rejected + sends completion notification
@@ -66,7 +66,12 @@ Approval rates use **exponential time decay** (half-life: 7 days) — recent dec
 
 ## Installation
 
-**Global install** (recommended) — add to the `mcpServers` field in **`~/.claude.json`**:
+Relay supports both **Claude Code** and **Codex**. Add the MCP server to your agent config; on first startup, Relay installs hooks for both clients:
+
+- Claude Code hooks: `~/.claude/settings.json`
+- Codex hooks: `~/.codex/config.toml`
+
+**Claude Code global config** — add to the `mcpServers` field in **`~/.claude.json`**:
 
 ```json
 {
@@ -80,26 +85,21 @@ Approval rates use **exponential time decay** (half-life: 7 days) — recent dec
 }
 ```
 
-**Per-project install** — create **`.mcp.json`** in your project root:
+**Codex global config** — add to **`~/.codex/config.toml`**:
 
-```json
-{
-  "mcpServers": {
-    "relay": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["cc-relay@latest"]
-    }
-  }
-}
+```toml
+[mcp_servers.relay]
+type = "stdio"
+command = "uvx"
+args = ["cc-relay@latest"]
 ```
 
-Restart Claude Code. Relay registers its hooks into `~/.claude/settings.json` on first startup. No further configuration needed.
+Restart your agent. Relay starts as an MCP server and runs `--install-all` behavior automatically, so both Claude Code and Codex hooks are kept up to date.
 
 ## Uninstall
 
 ```bash
-uvx cc-relay --uninstall
+uvx cc-relay --uninstall-all
 ```
 
 ## Notification support
@@ -107,7 +107,7 @@ uvx cc-relay --uninstall
 Relay sends two types of desktop notifications. Text auto-switches based on system language (Chinese, English, Japanese, Korean).
 
 - **Interrupt**: when an action needs your approval — prompts you to return to the terminal
-- **Completion**: when Claude finishes responding — so you know the task is done even if you stepped away
+- **Completion**: when the agent finishes responding — so you know the task is done even if you stepped away
 
 | Platform | Implementation | Notes |
 |---|---|---|
@@ -117,7 +117,7 @@ Relay sends two types of desktop notifications. Text auto-switches based on syst
 
 ## MCP tools
 
-Once installed, Relay works automatically. You can also call these tools directly inside Claude Code:
+Once installed, Relay works automatically. You can also call these tools directly inside Claude Code or Codex:
 
 | Tool | Description |
 |---|---|
@@ -128,9 +128,15 @@ Once installed, Relay works automatically. You can also call these tools directl
 ## CLI
 
 ```bash
-# Install / uninstall hooks
+# Install / uninstall both Claude Code and Codex hooks
+uvx cc-relay --install-all
+uvx cc-relay --uninstall-all
+
+# Advanced: manage one client only
 uvx cc-relay --install
+uvx cc-relay --install-codex
 uvx cc-relay --uninstall
+uvx cc-relay --uninstall-codex
 
 # View recent decisions for an action type (default 20)
 uvx cc-relay --history bash_write:git

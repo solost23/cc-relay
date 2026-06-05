@@ -1,7 +1,7 @@
 [project]
 name = "cc-relay"
-version = "0.2.4"
-description = "Intelligent interrupt layer for Claude — learns when to ask, when to proceed"
+version = "0.3.0"
+description = "Intelligent interrupt layer for Claude Code and Codex — learns when to ask, when to proceed"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"

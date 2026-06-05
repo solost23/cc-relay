@@ -11,12 +11,21 @@ _TOOL_TO_ACTION_TYPE = {
     "Read": "file_read",
     "Glob": "file_read",
     "Grep": "file_read",
+    "list_files": "file_read",
+    "read_file": "file_read",
+    "search": "file_read",
     "WebFetch": "network_request",
     "WebSearch": "network_request",
+    "web_search": "network_request",
 }
 
 # Tools that are always safe — skip assessment entirely
-_ALWAYS_ALLOW = {"Read", "Glob", "Grep", "WebSearch", "AskUserQuestion", "ExitPlanMode", "LSP"}
+_ALWAYS_ALLOW = {
+    "Read", "Glob", "Grep", "WebSearch", "AskUserQuestion", "ExitPlanMode", "LSP",
+    "list_files", "read_file", "search",
+}
+_COMMAND_TOOLS = {"Bash", "shell_command", "exec_command", "unified_exec", "functions.exec_command"}
+_PATCH_TOOLS = {"apply_patch", "functions.apply_patch"}
 
 _SYSTEM_PATHS = ("/etc/", "/usr/", "/bin/", "/sbin/", "/boot/", "/sys/", "/proc/")
 _CONFIG_EXTS = (".env", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf")
@@ -90,20 +99,38 @@ def _bash_action_type(command: str) -> str:
     return max(types, key=_rank)
 
 
+def _get_command(tool_input: dict) -> str:
+    command = tool_input.get("command") or tool_input.get("cmd") or tool_input.get("shell_command")
+    if command:
+        return str(command)
+    argv = tool_input.get("argv") or tool_input.get("args")
+    if isinstance(argv, list):
+        return " ".join(str(arg) for arg in argv)
+    return ""
+
+
 def _get_action_type(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "Bash":
-        return _bash_action_type(tool_input.get("command", ""))
+    if tool_name in _COMMAND_TOOLS:
+        return _bash_action_type(_get_command(tool_input))
     if tool_name in ("Write", "Edit", "NotebookEdit"):
         path = tool_input.get("file_path", "") or tool_input.get("notebook_path", "")
         return _file_action_type(path)
+    if tool_name in _PATCH_TOOLS:
+        patch = tool_input.get("patch", "") or tool_input.get("input", "")
+        if "delete file" in str(patch).lower():
+            return "file_delete"
+        return "file_write:code"
     return _TOOL_TO_ACTION_TYPE.get(tool_name, "bash_write:shell")
 
 
 def _get_description(tool_name: str, tool_input: dict) -> str:
-    if tool_name == "Bash":
-        return tool_input.get("command", "")[:200]
+    if tool_name in _COMMAND_TOOLS:
+        return _get_command(tool_input)[:200]
     if tool_name in ("Write", "Edit", "NotebookEdit"):
         return tool_input.get("file_path", "") or tool_input.get("notebook_path", "")
+    if tool_name in _PATCH_TOOLS:
+        patch = tool_input.get("patch", "") or tool_input.get("input", "")
+        return str(patch)[:200] or "apply_patch"
     if tool_name in ("Read", "Glob", "Grep"):
         return tool_input.get("file_path", "") or tool_input.get("pattern", "")
     if tool_name in ("WebFetch", "WebSearch"):
@@ -111,11 +138,20 @@ def _get_description(tool_name: str, tool_input: dict) -> str:
     return json.dumps(tool_input)[:200]
 
 
-def handle_pre_tool_use(payload: dict) -> dict:
+def _client_name(payload: dict, client: str | None = None) -> str:
+    if client in ("claude", "codex"):
+        return client
+    if "hook_event_name" in payload:
+        return "codex"
+    return "claude"
+
+
+def handle_pre_tool_use(payload: dict, client: str | None = None) -> dict:
+    client_name = _client_name(payload, client)
     tool_name = payload.get("tool_name", "")
 
     if tool_name in _ALWAYS_ALLOW:
-        return _allow()
+        return _allow(client_name)
 
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
@@ -126,11 +162,11 @@ def handle_pre_tool_use(payload: dict) -> dict:
         risk = assess_risk(action_type, description)
         _db.record_decision(action_type, description, "rejected", risk["risk_level"])
         send_notification(message=f"{tool_name}: {description[:100]}")
-        return _ask(reason)
+        return _interrupt(reason, client_name)
 
     risk = assess_risk(action_type, description)
     _db.record_decision(action_type, description, "approved", risk["risk_level"])
-    return _allow()
+    return _allow(client_name)
 
 
 def handle_post_tool_use(payload: dict) -> dict:
@@ -151,7 +187,9 @@ def handle_stop(payload: dict) -> dict:
     return {}
 
 
-def _allow() -> dict:
+def _allow(client: str = "claude") -> dict:
+    if client == "codex":
+        return {}
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -160,7 +198,12 @@ def _allow() -> dict:
     }
 
 
-def _ask(reason: str) -> dict:
+def _interrupt(reason: str, client: str = "claude") -> dict:
+    if client == "codex":
+        return {
+            "decision": "block",
+            "reason": reason,
+        }
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -170,10 +213,11 @@ def _ask(reason: str) -> dict:
     }
 
 
-def run_pre_tool_use() -> None:
+def run_pre_tool_use(client: str | None = None) -> None:
     payload = json.loads(sys.stdin.read())
-    result = handle_pre_tool_use(payload)
-    print(json.dumps(result))
+    result = handle_pre_tool_use(payload, client)
+    if result:
+        print(json.dumps(result))
 
 
 def run_post_tool_use() -> None:

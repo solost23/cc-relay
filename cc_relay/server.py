@@ -3,13 +3,13 @@ from mcp.server.fastmcp import FastMCP
 import cc_relay.db as _db
 from cc_relay.assessor import assess_risk
 from cc_relay.decision import should_interrupt as _should_interrupt
-from cc_relay.installer import ensure_installed
+from cc_relay.installer import ensure_all_installed
 from cc_relay.notifier import send_notification
 
 mcp = FastMCP("relay")
 
 _db.init_db()
-ensure_installed()
+ensure_all_installed()
 
 
 @mcp.tool()

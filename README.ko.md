@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Relay는 Claude Code의 적응형 인터럽트 레이어입니다. 훅을 통해 모든 도구 호출을 가로채고, 승인 기록에서 학습하여 어떤 작업을 바로 실행하고 어떤 작업을 일시 중지할지 자동으로 결정합니다. 실제로 판단이 필요할 때만 알림을 보내므로, 작업이 멈춰도 놓치는 일이 없습니다.
+Relay는 Claude Code와 Codex를 모두 지원하는 적응형 인터럽트 레이어입니다. 훅을 통해 도구 호출을 가로채고, 승인 기록에서 학습하여 어떤 작업을 바로 실행하고 어떤 작업을 일시 중지할지 자동으로 결정합니다. 실제로 판단이 필요할 때만 알림을 보내므로, 작업이 멈춰도 놓치는 일이 없습니다.
 
 **핵심 가치:** 다른 도구들은 정적 규칙이나 매번 LLM을 호출하는 방식을 사용하지만, Relay는 작업 유형별 실제 승인율을 추적하고 시간이 지남에 따라 자동으로 적응합니다. `git commit`을 10번 승인하면 더 이상 묻지 않습니다. 고위험 작업은 항상 인터럽트하고, 나머지는 사용할수록 조용해집니다.
 
@@ -23,16 +23,16 @@ Relay는 Claude Code의 적응형 인터럽트 레이어입니다. 훅을 통해
 ## 작동 방식
 
 ```
-Claude가 도구를 실행하려 함 (Write, Bash, Edit 등)
+에이전트가 도구를 실행하려 함 (Write, Bash, Edit, shell command 등)
     ↓
 PreToolUse 훅 실행 → relay hook pre
     ↓
 과거 승인율 조회 + 위험 수준 평가
     ↓
 allow → 도구 즉시 실행, 승인됨으로 기록
-ask   → 도구 일시 중지, 보류 레코드 기록, 데스크톱 알림 전송, Claude Code가 확인 프롬프트 표시
+interrupt → 도구 일시 중지 또는 차단, 보류 레코드 기록, 데스크톱 알림 전송, 클라이언트가 판단 요청
     ↓
-사용자 확인 → Claude 계속 진행, PostToolUse 훅이 보류 레코드를 승인됨으로 표시
+사용자 확인 → 에이전트 계속 진행, PostToolUse 훅이 보류 레코드를 승인됨으로 표시
 사용자 거부 → 세션 종료
     ↓
 Stop 훅 실행 → 보류 레코드를 거부됨으로 표시 + 작업 완료 알림 전송
@@ -68,7 +68,12 @@ Stop 훅 실행 → 보류 레코드를 거부됨으로 표시 + 작업 완료 �
 
 ## 설치
 
-**전역 설치** (권장) — **`~/.claude.json`** 의 `mcpServers` 필드에 다음을 추가하세요:
+Relay는 **Claude Code** 와 **Codex** 를 모두 지원합니다. MCP server를 에이전트 설정에 추가하면 첫 실행 시 두 클라이언트의 훅을 자동으로 설치합니다:
+
+- Claude Code 훅: `~/.claude/settings.json`
+- Codex 훅: `~/.codex/config.toml`
+
+**Claude Code 전역 설정** — **`~/.claude.json`** 의 `mcpServers` 필드에 다음을 추가하세요:
 
 ```json
 {
@@ -82,26 +87,21 @@ Stop 훅 실행 → 보류 레코드를 거부됨으로 표시 + 작업 완료 �
 }
 ```
 
-**프로젝트별 설치** — 프로젝트 루트에 **`.mcp.json`** 을 생성하세요:
+**Codex 전역 설정** — **`~/.codex/config.toml`** 에 다음을 추가하세요:
 
-```json
-{
-  "mcpServers": {
-    "relay": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["cc-relay@latest"]
-    }
-  }
-}
+```toml
+[mcp_servers.relay]
+type = "stdio"
+command = "uvx"
+args = ["cc-relay@latest"]
 ```
 
-Claude Code를 재시작하세요. Relay는 첫 번째 시작 시 자동으로 훅을 `~/.claude/settings.json`에 등록합니다. 이후 모든 도구 호출이 relay 결정 레이어를 통과합니다.
+에이전트를 재시작하세요. Relay는 MCP server로 시작되며 자동으로 `--install-all` 동작을 수행해 Claude Code와 Codex 훅을 최신 상태로 유지합니다.
 
 ## 제거
 
 ```bash
-uvx cc-relay --uninstall
+uvx cc-relay --uninstall-all
 ```
 
 ## 알림 지원
@@ -109,7 +109,7 @@ uvx cc-relay --uninstall
 Relay는 두 가지 종류의 데스크톱 알림을 전송합니다. 알림 텍스트는 시스템 언어에 따라 자동으로 전환됩니다. 현재 지원 언어: 중국어, 영어, 일본어, 한국어.
 
 - **인터럽트 알림**: 작업 승인이 필요할 때 — 터미널로 돌아가도록 안내합니다
-- **완료 알림**: Claude가 응답을 완료했을 때 — 자리를 비워도 작업 완료를 알 수 있습니다
+- **완료 알림**: 에이전트가 응답을 완료했을 때 — 자리를 비워도 작업 완료를 알 수 있습니다
 
 | 플랫폼 | 구현 | 비고 |
 |---|---|---|
@@ -119,7 +119,7 @@ Relay는 두 가지 종류의 데스크톱 알림을 전송합니다. 알림 텍
 
 ## MCP 도구 (선택 사항)
 
-훅을 설치하면 Relay가 자동으로 작동하며 추가 설정이 필요 없습니다. Claude Code 내에서 다음 도구를 직접 호출할 수도 있습니다:
+훅을 설치하면 Relay가 자동으로 작동하며 추가 설정이 필요 없습니다. Claude Code 또는 Codex 내에서 다음 도구를 직접 호출할 수도 있습니다:
 
 | 도구 | 설명 |
 |---|---|
@@ -130,9 +130,15 @@ Relay는 두 가지 종류의 데스크톱 알림을 전송합니다. 알림 텍
 ## CLI 명령어
 
 ```bash
-# 훅 설치 / 제거
+# Claude Code와 Codex 훅 동시 설치 / 제거
+uvx cc-relay --install-all
+uvx cc-relay --uninstall-all
+
+# 고급 사용: 한 클라이언트만 관리
 uvx cc-relay --install
+uvx cc-relay --install-codex
 uvx cc-relay --uninstall
+uvx cc-relay --uninstall-codex
 
 # 작업 유형의 최근 결정 조회 (기본 20개)
 uvx cc-relay --history bash_write:git

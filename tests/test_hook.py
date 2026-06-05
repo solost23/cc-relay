@@ -76,6 +76,35 @@ def test_bash_action_type_multiline_escalates():
     assert _bash_action_type("git status\nrm -rf /tmp/foo") == "file_delete"
 
 
+def test_codex_command_tool_uses_cmd_field():
+    with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook.assess_risk", return_value={"risk_level": "low", "reversible": True, "reason": ""}):
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "exec_command",
+                "tool_input": {"cmd": "git status"},
+            }
+        )
+        assert result == {}
+        assert mock_record.call_args.args[0] == "bash_read"
+
+
+def test_codex_apply_patch_delete_is_file_delete():
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "delete")), \
+         patch("cc_relay.hook._db.record_decision") as mock_record, \
+         patch("cc_relay.hook.send_notification"):
+        handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "apply_patch",
+                "tool_input": {"patch": "*** Delete File: old.py\n"},
+            }
+        )
+        assert mock_record.call_args.args[0] == "file_delete"
+
+
 # --- always-allow tools ---
 
 def test_always_allow_tools_pass_through():
@@ -123,6 +152,34 @@ def test_interrupt_returns_ask():
         assert _decision(result) == "ask"
 
 
+def test_codex_auto_approved_action_returns_empty_allow():
+    with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
+         patch("cc_relay.hook._db.record_decision"), \
+         patch("cc_relay.hook.assess_risk", return_value={"risk_level": "low", "reversible": True, "reason": ""}):
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "git status"},
+            }
+        )
+        assert result == {}
+
+
+def test_codex_interrupt_returns_block():
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook._db.record_decision"), \
+         patch("cc_relay.hook.send_notification"):
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "rm -rf /"},
+            }
+        )
+        assert result == {"decision": "block", "reason": "high risk"}
+
+
 def test_interrupt_includes_reason():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "dangerous op")), \
          patch("cc_relay.hook._db.record_decision"), \
@@ -161,4 +218,3 @@ def test_post_approves_latest_rejected_when_tool_ran():
 def test_stop_is_noop():
     result = handle_stop({})
     assert result == {}
-

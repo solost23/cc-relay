@@ -15,9 +15,25 @@ def main() -> None:
         from cc_relay.installer import install
         install()
 
+    elif cmd == "--install-codex":
+        from cc_relay.installer import install_codex
+        install_codex()
+
+    elif cmd == "--install-all":
+        from cc_relay.installer import install_all
+        install_all()
+
     elif cmd == "--uninstall":
         from cc_relay.installer import uninstall
         uninstall()
+
+    elif cmd == "--uninstall-codex":
+        from cc_relay.installer import uninstall_codex
+        uninstall_codex()
+
+    elif cmd == "--uninstall-all":
+        from cc_relay.installer import uninstall_all
+        uninstall_all()
 
     elif cmd == "--reset":
         if len(args) < 2:
@@ -43,9 +59,19 @@ def main() -> None:
         from cc_relay.db import init_db
         init_db()
         subcommand = args[1]
+        client = None
+        if "--client" in args:
+            idx = args.index("--client")
+            if idx + 1 >= len(args):
+                print("Usage: cc-relay hook pre|post|stop [--client claude|codex]", file=sys.stderr)
+                sys.exit(1)
+            client = args[idx + 1]
+            if client not in ("claude", "codex"):
+                print("Usage: cc-relay hook pre|post|stop [--client claude|codex]", file=sys.stderr)
+                sys.exit(1)
         if subcommand == "pre":
             from cc_relay.hook import run_pre_tool_use
-            run_pre_tool_use()
+            run_pre_tool_use(client)
         elif subcommand == "post":
             from cc_relay.hook import run_post_tool_use
             run_post_tool_use()
@@ -57,7 +83,7 @@ def main() -> None:
             sys.exit(1)
 
     else:
-        print("Usage: cc-relay [--install | --uninstall | --reset <type> | --history <type> [limit] | hook pre|post|stop]", file=sys.stderr)
+        print("Usage: cc-relay [--install | --install-codex | --install-all | --uninstall | --uninstall-codex | --uninstall-all | --reset <type> | --history <type> [limit] | hook pre|post|stop [--client claude|codex]]", file=sys.stderr)
         sys.exit(1)
 
 

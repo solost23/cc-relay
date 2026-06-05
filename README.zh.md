@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/cc-relay)](https://pypi.org/project/cc-relay/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Relay 是一个 Claude Code 自适应中断层。它通过 hook 拦截每次工具调用，从你的审批历史中学习，自动决定哪些操作直接执行、哪些需要暂停——只在真正需要你决策时才打断你，并发送桌面通知，让你不会错过任何需要处理的时刻。
+Relay 是一个支持 Claude Code 和 Codex 的自适应中断层。它通过 hook 拦截工具调用，从你的审批历史中学习，自动决定哪些操作直接执行、哪些需要暂停——只在真正需要你决策时才打断你，并发送桌面通知，让你不会错过任何需要处理的时刻。
 
 **核心价值：** 其他权限工具用静态规则或每次调用 LLM 判断，Relay 追踪你对每类操作的实际批准率，随时间自动适应。批准 `git commit` 十次之后，它就不再问了。高风险操作始终拦截——其他操作会随着使用越来越安静。
 
@@ -23,16 +23,16 @@ Relay 是一个 Claude Code 自适应中断层。它通过 hook 拦截每次工�
 ## 工作原理
 
 ```
-Claude 准备执行工具（Write、Bash、Edit 等）
+Agent 准备执行工具（Write、Bash、Edit、shell command 等）
     ↓
 PreToolUse hook 触发 → relay hook pre
     ↓
 查询历史批准率 + 评估风险等级
     ↓
 allow → 工具直接执行，自动记录为已批准
-ask   → 工具暂停，写入待处理记录，发送桌面通知，Claude Code 弹出确认提示
+interrupt → 工具暂停或被阻止，写入待处理记录，发送桌面通知，客户端请求你决策
     ↓
-用户确认后 Claude 继续，PostToolUse hook 将待处理记录标记为已批准
+用户确认后 agent 继续，PostToolUse hook 将待处理记录标记为已批准
 用户拒绝后会话结束
     ↓
 Stop hook 触发 → 将待处理记录标记为已拒绝 + 发送任务完成通知
@@ -68,7 +68,12 @@ Stop hook 触发 → 将待处理记录标记为已拒绝 + 发送任务完成�
 
 ## 安装
 
-**全局安装**（推荐）——将以下内容添加到 **`~/.claude.json`** 的 `mcpServers` 字段：
+Relay 同时支持 **Claude Code** 和 **Codex**。把 MCP server 添加到对应客户端配置后，Relay 首次启动会自动为两个客户端安装 hook：
+
+- Claude Code hook：`~/.claude/settings.json`
+- Codex hook：`~/.codex/config.toml`
+
+**Claude Code 全局配置**——将以下内容添加到 **`~/.claude.json`** 的 `mcpServers` 字段：
 
 ```json
 {
@@ -82,26 +87,21 @@ Stop hook 触发 → 将待处理记录标记为已拒绝 + 发送任务完成�
 }
 ```
 
-**项目级安装**——在项目根目录创建 **`.mcp.json`**：
+**Codex 全局配置**——将以下内容添加到 **`~/.codex/config.toml`**：
 
-```json
-{
-  "mcpServers": {
-    "relay": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["cc-relay@latest"]
-    }
-  }
-}
+```toml
+[mcp_servers.relay]
+type = "stdio"
+command = "uvx"
+args = ["cc-relay@latest"]
 ```
 
-重启 Claude Code。Relay 会在首次启动时自动将 hook 注册到 `~/.claude/settings.json`，之后所有工具调用都会经过 relay 的决策层。
+重启客户端。Relay 作为 MCP server 启动时会自动执行 `--install-all` 行为，保持 Claude Code 和 Codex 的 hook 都是最新版本。
 
 ## 卸载
 
 ```bash
-uvx cc-relay --uninstall
+uvx cc-relay --uninstall-all
 ```
 
 ## 通知支持
@@ -109,7 +109,7 @@ uvx cc-relay --uninstall
 Relay 会发送两种桌面通知，通知文字根据系统语言自动切换，目前支持中文、英文、日文、韩文。
 
 - **拦截通知**：当某个操作需要你确认时——提示你返回终端处理
-- **完成通知**：当 Claude 完成响应时——即使你离开了也能知道任务已结束
+- **完成通知**：当 agent 完成响应时——即使你离开了也能知道任务已结束
 
 | 平台 | 实现 | 说明 |
 |---|---|---|
@@ -119,7 +119,7 @@ Relay 会发送两种桌面通知，通知文字根据系统语言自动切换�
 
 ## MCP 工具（可选）
 
-安装 hook 后 relay 已经自动工作，不需要额外配置。你也可以在 Claude Code 里直接调用以下工具：
+安装 hook 后 relay 已经自动工作，不需要额外配置。你也可以在 Claude Code 或 Codex 里直接调用以下工具：
 
 | 工具 | 说明 |
 |---|---|
@@ -130,9 +130,15 @@ Relay 会发送两种桌面通知，通知文字根据系统语言自动切换�
 ## CLI 命令
 
 ```bash
-# 安装 / 卸载 hook
+# 同时安装 / 卸载 Claude Code 和 Codex hook
+uvx cc-relay --install-all
+uvx cc-relay --uninstall-all
+
+# 高级用法：只管理某一个客户端
 uvx cc-relay --install
+uvx cc-relay --install-codex
 uvx cc-relay --uninstall
+uvx cc-relay --uninstall-codex
 
 # 查看某操作类型的最近决策（默认 20 条）
 uvx cc-relay --history bash_write:git
@@ -155,4 +161,3 @@ uv sync
 uv run pytest
 uv run mcp dev cc_relay/server.py
 ```
-
