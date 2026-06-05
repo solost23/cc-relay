@@ -220,19 +220,30 @@ def _interrupt(reason: str, client: str = "claude") -> dict:
 
 
 def run_pre_tool_use(client: str | None = None) -> None:
-    payload = json.loads(sys.stdin.read())
+    payload = _read_payload()
     result = handle_pre_tool_use(payload, client)
     if result:
         print(json.dumps(result))
 
 
 def run_post_tool_use() -> None:
-    payload = json.loads(sys.stdin.read())
+    payload = _read_payload()
     result = handle_post_tool_use(payload)
     if result:
         print(json.dumps(result))
 
 
 def run_stop() -> None:
-    payload = json.loads(sys.stdin.read())
+    payload = _read_payload()
     handle_stop(payload)
+
+
+def _read_payload() -> dict:
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}

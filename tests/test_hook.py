@@ -1,6 +1,11 @@
+import io
+
 import pytest
 from unittest.mock import patch
-from cc_relay.hook import handle_pre_tool_use, handle_post_tool_use, handle_stop, _file_action_type, _bash_action_type
+from cc_relay.hook import (
+    handle_pre_tool_use, handle_post_tool_use, handle_stop, run_post_tool_use,
+    run_pre_tool_use, run_stop, _file_action_type, _bash_action_type,
+)
 import cc_relay.db as db_module
 
 
@@ -259,3 +264,23 @@ def test_post_approves_latest_rejected_when_tool_ran():
 def test_stop_is_noop():
     result = handle_stop({})
     assert result == {}
+
+
+def test_hook_runners_tolerate_empty_stdin(monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    with patch("cc_relay.hook.handle_pre_tool_use", return_value={}):
+        run_pre_tool_use("codex")
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    with patch("cc_relay.hook.handle_post_tool_use", return_value={}):
+        run_post_tool_use()
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    with patch("cc_relay.hook.handle_stop", return_value={}):
+        run_stop()
+
+
+def test_hook_runners_tolerate_invalid_json(monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+    with patch("cc_relay.hook.handle_pre_tool_use", return_value={}):
+        run_pre_tool_use("codex")
