@@ -37,11 +37,25 @@ def test_install_writes_versioned_hooks(settings_file):
     ver = version("cc-relay")
     assert f"cc-relay=={ver}" in pre_hooks
     assert f"cc-relay=={ver}" in post_hooks
+    assert "--client claude" in pre_hooks
+    assert "--client claude" in post_hooks
 
 
 def test_is_installed_true_after_install(settings_file):
     install()
     assert is_installed() is True
+
+
+def test_is_installed_false_for_missing_claude_client_arg(settings_file):
+    from importlib.metadata import version
+    ver = version("cc-relay")
+    settings_file.write_text(json.dumps({
+        "hooks": {
+            "PreToolUse": [{"matcher": ".*", "hooks": [{"command": f"uvx cc-relay=={ver} hook pre"}]}],
+            "Stop": [{"hooks": [{"command": f"uvx cc-relay=={ver} hook stop"}]}],
+        }
+    }))
+    assert is_installed() is False
 
 
 def test_is_installed_false_for_different_version(settings_file):

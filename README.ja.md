@@ -152,6 +152,8 @@ uvx cc-relay --reset bash_write:git
 
 Relay フックは `--dangerously-skip-permissions` モードでは動作しません（このモードはフック機構を完全にバイパスします）。
 
+Codex の PreToolUse フックは、その場で対話的な承認プロンプトを表示して一時停止できません。Relay が Codex の操作をブロックした場合、エージェントは停止してユーザーの明示的な指示を待つ必要があります。同じ操作を明示的に承認してエージェントが再試行すると、Relay は直近の rejected レコードを approved に反転し、その再試行を許可します。
+
 ## ローカル開発
 
 ```bash

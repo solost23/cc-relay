@@ -152,6 +152,8 @@ uvx cc-relay --reset bash_write:git
 
 Relay 훅은 `--dangerously-skip-permissions` 모드에서 작동하지 않습니다 (해당 모드는 훅 메커니즘을 완전히 우회합니다).
 
+Codex PreToolUse 훅은 그 자리에서 대화형 승인 프롬프트로 일시 중지할 수 없습니다. Relay가 Codex 작업을 차단하면 에이전트는 중지하고 사용자의 명시적인 지시를 기다려야 합니다. 사용자가 정확히 같은 작업을 명시적으로 승인하고 에이전트가 다시 시도하면 Relay는 최근 rejected 기록을 approved로 뒤집고 해당 재시도를 허용합니다.
+
 ## 로컬 개발
 
 ```bash

@@ -152,6 +152,8 @@ uvx cc-relay --reset bash_write:git
 
 Relay hook 在 `--dangerously-skip-permissions` 模式下不生效（该模式完全跳过 hook 机制）。
 
+Codex 的 PreToolUse hook 不能在原地暂停并弹出交互式审批。Relay 拦截 Codex 操作后，agent 必须停止并等待你的明确指令；如果你明确同意这一次完全相同的操作，agent 重试时 Relay 会把最近那条 rejected 记录反转为 approved，并放行这次重试。
+
 ## 本地开发
 
 ```bash

@@ -9,7 +9,9 @@ from cc_relay.notifier import send_notification, send_completion_notification
 _CODEX_BLOCK_SUFFIX = (
     "Relay blocked this Codex tool call. Codex PreToolUse hooks cannot pause for "
     "interactive approval here, so do not try an alternate tool call or workaround. "
-    "Stop and wait for the user to send a new instruction if they want to proceed."
+    "Stop and wait for the user to send a new instruction. If the user explicitly "
+    "approves this exact action, retry it once; Relay will flip the blocked record "
+    "to approved and allow it."
 )
 _NOTIFICATION_FAILED_SUFFIX = (
     "Relay could not deliver the desktop notification; check your system "
@@ -153,8 +155,6 @@ def _get_description(tool_name: str, tool_input: dict) -> str:
 def _client_name(payload: dict, client: str | None = None) -> str:
     if client in ("claude", "codex"):
         return client
-    if "hook_event_name" in payload:
-        return "codex"
     return "claude"
 
 
@@ -167,6 +167,9 @@ def handle_pre_tool_use(payload: dict, client: str | None = None) -> dict:
 
     action_type = _get_action_type(tool_name, payload.get("tool_input", {}))
     description = _get_description(tool_name, payload.get("tool_input", {}))
+
+    if client_name == "codex" and _db.approve_recent_rejected(action_type, description):
+        return _allow(client_name)
 
     interrupt, reason = _should_interrupt(
         action_type,

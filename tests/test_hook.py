@@ -91,7 +91,8 @@ def test_codex_command_tool_uses_cmd_field():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "exec_command",
                 "tool_input": {"cmd": "git status"},
-            }
+            },
+            "codex",
         )
         assert result == {}
         assert mock_record.call_args.args[0] == "bash_read"
@@ -106,7 +107,8 @@ def test_codex_apply_patch_delete_is_file_delete():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "apply_patch",
                 "tool_input": {"patch": "*** Delete File: old.py\n"},
-            }
+            },
+            "codex",
         )
         assert mock_record.call_args.args[0] == "file_delete"
 
@@ -121,7 +123,8 @@ def test_codex_apply_patch_without_payload_is_unknown_patch():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "apply_patch",
                 "tool_input": {},
-            }
+            },
+            "codex",
         )
         assert result["decision"] == "block"
         assert result["reason"].startswith("unknown patch")
@@ -181,6 +184,22 @@ def test_interrupt_returns_ask():
         assert _decision(result) == "ask"
 
 
+def test_hook_event_name_does_not_override_default_claude_client():
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook._db.record_decision"), \
+         patch("cc_relay.hook.send_notification") as mock_notify:
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "rm -rf /"},
+            }
+        )
+
+    assert _decision(result) == "ask"
+    mock_notify.assert_called_once_with(message="Bash: rm -rf /", client="claude")
+
+
 def test_codex_auto_approved_action_returns_empty_allow():
     with patch("cc_relay.hook._should_interrupt", return_value=(False, "auto")), \
          patch("cc_relay.hook._db.record_decision"), \
@@ -190,7 +209,8 @@ def test_codex_auto_approved_action_returns_empty_allow():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "Bash",
                 "tool_input": {"command": "git status"},
-            }
+            },
+            "codex",
         )
         assert result == {}
 
@@ -204,7 +224,8 @@ def test_codex_interrupt_returns_block():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "Bash",
                 "tool_input": {"command": "rm -rf /"},
-            }
+            },
+            "codex",
         )
         assert result["decision"] == "block"
         assert result["reason"].startswith("high risk")
@@ -221,7 +242,8 @@ def test_codex_interrupt_reports_notification_failure():
                 "hook_event_name": "PreToolUse",
                 "tool_name": "Bash",
                 "tool_input": {"command": "rm -rf /"},
-            }
+            },
+            "codex",
         )
 
     assert result["decision"] == "block"
@@ -229,7 +251,7 @@ def test_codex_interrupt_reports_notification_failure():
     assert "Stop and wait for the user" in result["reason"]
 
 
-def test_codex_repeated_blocked_action_stays_blocked(tmp_path, monkeypatch):
+def test_codex_retried_blocked_action_is_approved(tmp_path, monkeypatch):
     test_db = tmp_path / "test.db"
     db_module.init_db(test_db)
     monkeypatch.setattr(db_module, "_DEFAULT_DB", test_db)
@@ -245,8 +267,9 @@ def test_codex_repeated_blocked_action_stays_blocked(tmp_path, monkeypatch):
         second = handle_pre_tool_use(payload, "codex")
 
     assert first["decision"] == "block"
-    assert second["decision"] == "block"
-    assert "Stop and wait for the user" in second["reason"]
+    assert "retry it once" in first["reason"]
+    assert second == {}
+    assert db_module.get_approval_rate("bash_write:git") == 1.0
 
 
 def test_interrupt_includes_reason():

@@ -150,6 +150,8 @@ uvx cc-relay --reset bash_write:git
 
 Relay hooks do not fire in `--dangerously-skip-permissions` mode (that mode bypasses the hook mechanism entirely).
 
+Codex PreToolUse hooks cannot pause for an inline approval prompt. When Relay blocks a Codex action, the agent must stop and wait for you; if you explicitly approve the exact action and the agent retries it, Relay flips the recent rejected record to approved and lets that retry through.
+
 ## Local development
 
 ```bash

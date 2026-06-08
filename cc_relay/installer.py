@@ -107,10 +107,9 @@ def _write_codex_config_hooks(hooks: dict) -> None:
 
 def _relay_hook(subcommand: str, timeout: int, client: str = "claude") -> dict:
     ver = version("cc-relay")
-    client_arg = "" if client == "claude" else f" --client {client}"
     hook = {
         "type": "command",
-        "command": f"uvx cc-relay=={ver} hook {subcommand}{client_arg}",
+        "command": f"uvx cc-relay=={ver} hook {subcommand} --client {client}",
         "timeout": timeout,
     }
     if subcommand == "pre":
@@ -132,8 +131,8 @@ def is_installed() -> bool:
     settings = _load_settings()
     hooks = settings.get("hooks", {})
     pre = hooks.get("PreToolUse", [])
-    pre_first = bool(pre) and f"cc-relay=={ver}" in json.dumps(pre[0])
-    stop_ok = any(f"cc-relay=={ver}" in json.dumps(h) for h in hooks.get("Stop", []))
+    pre_first = bool(pre) and f"cc-relay=={ver}" in json.dumps(pre[0]) and "--client claude" in json.dumps(pre[0])
+    stop_ok = any(f"cc-relay=={ver}" in json.dumps(h) and "--client claude" in json.dumps(h) for h in hooks.get("Stop", []))
     return pre_first and stop_ok
 
 
