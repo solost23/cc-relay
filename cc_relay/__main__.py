@@ -77,7 +77,7 @@ def main() -> None:
             run_post_tool_use()
         elif subcommand == "stop":
             from cc_relay.hook import run_stop
-            run_stop()
+            run_stop(client)
         else:
             print(f"Unknown hook subcommand: {subcommand}", file=sys.stderr)
             sys.exit(1)

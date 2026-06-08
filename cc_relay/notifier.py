@@ -63,24 +63,25 @@ def _t() -> dict:
     return _STRINGS.get(lang, _STRINGS[_DEFAULT_LANG])
 
 
-def send_notification(message: str, timeout: int = 30) -> bool:
+def send_notification(message: str, timeout: int = 30, client: str = "claude") -> bool:
     s = _t()
+    title = f"{s['title']} ({_agent_name(client)})"
     try:
         system = platform.system()
         if system == "Darwin":
             safe_msg = (message + s["suffix"]).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "")
-            safe_title = s["title"].replace('"', '\\"')
+            safe_title = title.replace('"', '\\"')
             script = f'display notification "{safe_msg}" with title "{safe_title}"'
             subprocess.Popen(["osascript", "-e", script])
         elif system == "Linux":
             subprocess.run(
-                ["notify-send", "--expire-time", str(timeout * 1000), s["title"], message],
+                ["notify-send", "--expire-time", str(timeout * 1000), title, message],
                 check=True,
                 capture_output=True,
             )
         elif system == "Windows":
             from plyer import notification
-            notification.notify(title=s["title"], message=message, app_name="Relay", timeout=timeout)
+            notification.notify(title=title, message=message, app_name="Relay", timeout=timeout)
         else:
             return False
         return True
@@ -88,23 +89,29 @@ def send_notification(message: str, timeout: int = 30) -> bool:
         return False
 
 
-def send_completion_notification() -> bool:
+def _agent_name(client: str = "claude") -> str:
+    return "Codex" if client == "codex" else "Claude"
+
+
+def send_completion_notification(client: str = "claude") -> bool:
     s = _t()
+    agent = _agent_name(client)
+    done_title = s["done_title"].replace("Claude", agent)
     try:
         system = platform.system()
         if system == "Darwin":
             safe_msg = s["done_msg"].replace("\\", "\\\\").replace('"', '\\"')
-            safe_title = s["done_title"].replace('"', '\\"')
+            safe_title = done_title.replace('"', '\\"')
             script = f'display notification "{safe_msg}" with title "{safe_title}"'
             subprocess.Popen(["osascript", "-e", script])
         elif system == "Linux":
             subprocess.run(
-                ["notify-send", s["done_title"], s["done_msg"]],
+                ["notify-send", done_title, s["done_msg"]],
                 check=True, capture_output=True,
             )
         elif system == "Windows":
             from plyer import notification
-            notification.notify(title=s["done_title"], message=s["done_msg"], app_name="Relay", timeout=10)
+            notification.notify(title=done_title, message=s["done_msg"], app_name="Relay", timeout=10)
         else:
             return False
         return True

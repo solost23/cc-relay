@@ -6,6 +6,16 @@ from cc_relay.assessor import assess_risk
 from cc_relay.decision import should_interrupt as _should_interrupt
 from cc_relay.notifier import send_notification, send_completion_notification
 
+_CODEX_BLOCK_SUFFIX = (
+    "Relay blocked this Codex tool call. Codex PreToolUse hooks cannot pause for "
+    "interactive approval here, so do not try an alternate tool call or workaround. "
+    "Stop and wait for the user to send a new instruction if they want to proceed."
+)
+_NOTIFICATION_FAILED_SUFFIX = (
+    "Relay could not deliver the desktop notification; check your system "
+    "notification permissions."
+)
+
 # Map Claude Code tool names to relay action_type
 _TOOL_TO_ACTION_TYPE = {
     "Read": "file_read",
@@ -161,13 +171,17 @@ def handle_pre_tool_use(payload: dict, client: str | None = None) -> dict:
     interrupt, reason = _should_interrupt(
         action_type,
         description,
-        allow_recent_rejected=client_name == "codex",
     )
 
     if interrupt:
         risk = assess_risk(action_type, description)
         _db.record_decision(action_type, description, "rejected", risk["risk_level"])
-        send_notification(message=f"{tool_name}: {description[:100]}")
+        notified = send_notification(
+            message=f"{tool_name}: {description[:100]}",
+            client=client_name,
+        )
+        if not notified:
+            reason = f"{reason} {_NOTIFICATION_FAILED_SUFFIX}"
         return _interrupt(reason, client_name)
 
     risk = assess_risk(action_type, description)
@@ -188,8 +202,8 @@ def handle_post_tool_use(payload: dict) -> dict:
     return {}
 
 
-def handle_stop(payload: dict) -> dict:
-    send_completion_notification()
+def handle_stop(payload: dict, client: str | None = None) -> dict:
+    send_completion_notification(_client_name(payload, client))
     return {}
 
 
@@ -206,6 +220,7 @@ def _allow(client: str = "claude") -> dict:
 
 def _interrupt(reason: str, client: str = "claude") -> dict:
     if client == "codex":
+        reason = f"{reason} {_CODEX_BLOCK_SUFFIX}"
         return {
             "decision": "block",
             "reason": reason,
@@ -233,9 +248,9 @@ def run_post_tool_use() -> None:
         print(json.dumps(result))
 
 
-def run_stop() -> None:
+def run_stop(client: str | None = None) -> None:
     payload = _read_payload()
-    handle_stop(payload)
+    handle_stop(payload, client)
 
 
 def _read_payload() -> dict:

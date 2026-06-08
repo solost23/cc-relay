@@ -123,7 +123,9 @@ def test_codex_apply_patch_without_payload_is_unknown_patch():
                 "tool_input": {},
             }
         )
-        assert result == {"decision": "block", "reason": "unknown patch"}
+        assert result["decision"] == "block"
+        assert result["reason"].startswith("unknown patch")
+        assert "Stop and wait for the user" in result["reason"]
         mock_record.assert_called_once_with(
             "file_patch:unknown",
             "apply_patch with unavailable patch contents",
@@ -196,7 +198,7 @@ def test_codex_auto_approved_action_returns_empty_allow():
 def test_codex_interrupt_returns_block():
     with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
          patch("cc_relay.hook._db.record_decision"), \
-         patch("cc_relay.hook.send_notification"):
+         patch("cc_relay.hook.send_notification") as mock_notify:
         result = handle_pre_tool_use(
             {
                 "hook_event_name": "PreToolUse",
@@ -204,10 +206,30 @@ def test_codex_interrupt_returns_block():
                 "tool_input": {"command": "rm -rf /"},
             }
         )
-        assert result == {"decision": "block", "reason": "high risk"}
+        assert result["decision"] == "block"
+        assert result["reason"].startswith("high risk")
+        assert "Stop and wait for the user" in result["reason"]
+        mock_notify.assert_called_once_with(message="Bash: rm -rf /", client="codex")
 
 
-def test_codex_repeated_blocked_action_is_allowed_after_confirmation(tmp_path, monkeypatch):
+def test_codex_interrupt_reports_notification_failure():
+    with patch("cc_relay.hook._should_interrupt", return_value=(True, "high risk")), \
+         patch("cc_relay.hook._db.record_decision"), \
+         patch("cc_relay.hook.send_notification", return_value=False):
+        result = handle_pre_tool_use(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "rm -rf /"},
+            }
+        )
+
+    assert result["decision"] == "block"
+    assert "could not deliver the desktop notification" in result["reason"]
+    assert "Stop and wait for the user" in result["reason"]
+
+
+def test_codex_repeated_blocked_action_stays_blocked(tmp_path, monkeypatch):
     test_db = tmp_path / "test.db"
     db_module.init_db(test_db)
     monkeypatch.setattr(db_module, "_DEFAULT_DB", test_db)
@@ -223,7 +245,8 @@ def test_codex_repeated_blocked_action_is_allowed_after_confirmation(tmp_path, m
         second = handle_pre_tool_use(payload, "codex")
 
     assert first["decision"] == "block"
-    assert second == {}
+    assert second["decision"] == "block"
+    assert "Stop and wait for the user" in second["reason"]
 
 
 def test_interrupt_includes_reason():
@@ -261,9 +284,18 @@ def test_post_approves_latest_rejected_when_tool_ran():
 
 # --- stop hook ---
 
-def test_stop_is_noop():
-    result = handle_stop({})
-    assert result == {}
+def test_stop_notifies_default_claude():
+    with patch("cc_relay.hook.send_completion_notification") as mock_notify:
+        result = handle_stop({})
+        assert result == {}
+        mock_notify.assert_called_once_with("claude")
+
+
+def test_stop_notifies_codex_client():
+    with patch("cc_relay.hook.send_completion_notification") as mock_notify:
+        result = handle_stop({}, "codex")
+        assert result == {}
+        mock_notify.assert_called_once_with("codex")
 
 
 def test_hook_runners_tolerate_empty_stdin(monkeypatch):
@@ -276,8 +308,9 @@ def test_hook_runners_tolerate_empty_stdin(monkeypatch):
         run_post_tool_use()
 
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
-    with patch("cc_relay.hook.handle_stop", return_value={}):
-        run_stop()
+    with patch("cc_relay.hook.handle_stop", return_value={}) as mock_stop:
+        run_stop("codex")
+        mock_stop.assert_called_once_with({}, "codex")
 
 
 def test_hook_runners_tolerate_invalid_json(monkeypatch):
